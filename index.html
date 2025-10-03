@@ -50,6 +50,10 @@
         let snowflakes = [];
         let tvVideoElement, tvVideoTexture;
 
+        // added TV loading animation resources
+        let tvLoadingCanvas, tvLoadingCtx, tvLoadingTexture, tvLoadingMesh;
+        let tvLoadingActive = true;
+        const TV_LOADING_FADE_SPEED = 0.03;
 
         // --- CONSTANTS ---
         const DESK_SURFACE_Y = 3.25;
@@ -246,6 +250,38 @@
             tvFrame.add(tvScreen);
             tvFrame.position.y = 0.6 + (3.7 / 2);
             consoleGroup.add(tvFrame);
+
+            // Create an animated loading overlay plane that sits slightly in front of the screen.
+            // It uses a 2D canvas texture that we update each frame until the video is playing.
+            function createTvLoadingOverlay(widthMeters = 6.3, heightMeters = 3.5) {
+                const aspect = widthMeters / heightMeters;
+                const canvasW = 640;
+                const canvasH = Math.round(canvasW / aspect);
+
+                tvLoadingCanvas = document.createElement('canvas');
+                tvLoadingCanvas.width = canvasW;
+                tvLoadingCanvas.height = canvasH;
+                tvLoadingCtx = tvLoadingCanvas.getContext('2d');
+
+                tvLoadingTexture = new THREE.CanvasTexture(tvLoadingCanvas);
+                tvLoadingTexture.minFilter = THREE.LinearFilter;
+                tvLoadingTexture.magFilter = THREE.LinearFilter;
+
+                const mat = new THREE.MeshBasicMaterial({
+                    map: tvLoadingTexture,
+                    transparent: true,
+                    opacity: 1.0,
+                    depthWrite: false // keep overlay visible on top
+                });
+                const plane = new THREE.Mesh(new THREE.PlaneGeometry(widthMeters, heightMeters), mat);
+                plane.position.z = 0.12; // slightly in front of the tvScreen
+                plane.renderOrder = 999;
+                return plane;
+            }
+
+            tvLoadingMesh = createTvLoadingOverlay();
+            tvFrame.add(tvLoadingMesh);
+
             return consoleGroup;
         }
 
@@ -367,6 +403,8 @@
 
             // Playlist for the TV: replace these paths / URLs with your videos
             const tvPlaylist = [
+                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
                 './videos/BrementownMusiciansUBIwerksComiColor.mp4',
                 './videos/PopeyeAliBaba_512kb.mp4',
                 './videos/TheCrystalBrawl_512kb.mp4'
@@ -421,6 +459,24 @@
                 });
             }
 
+            // Show/hide loading overlay based on video playback state.
+            // When the video reaches 'playing' state we fade out the loading overlay.
+            tvVideoElement.addEventListener('playing', () => {
+                tvLoadingActive = false; // start fade out in animate loop
+            });
+            // If video stalls or is waiting, bring the overlay back
+            tvVideoElement.addEventListener('waiting', () => {
+                if (tvLoadingMesh) {
+                    tvLoadingMesh.material.opacity = 1.0;
+                    tvLoadingMesh.visible = true;
+                    tvLoadingActive = true;
+                }
+            });
+            // If the playlist advances, reset overlay until next 'playing'
+            tvVideoElement.addEventListener('ended', () => {
+                tvLoadingActive = true;
+                if (tvLoadingMesh) { tvLoadingMesh.material.opacity = 1.0; tvLoadingMesh.visible = true; }
+            });
 
             // --- POST-PROCESSING (BLOOM) --- // modify bloomPass.strength for changes to brightness in video
             const renderScene = new RenderPass(scene, camera);
@@ -630,6 +686,73 @@
             // Update the video texture if the video is playing
             if (tvVideoElement && tvVideoElement.readyState >= tvVideoElement.HAVE_CURRENT_DATA) {
                 tvVideoTexture.needsUpdate = true;
+            }
+
+            // Update TV loading canvas animation while active or fading
+            if (tvLoadingCanvas && tvLoadingCtx && tvLoadingTexture && tvLoadingMesh && (tvLoadingActive || tvLoadingMesh.material.opacity > 0)) {
+                const ctx = tvLoadingCtx;
+                const w = tvLoadingCanvas.width;
+                const h = tvLoadingCanvas.height;
+                ctx.clearRect(0, 0, w, h);
+
+                const t = performance.now() * 0.001;
+
+                // Background gradient with subtle color pulse
+                const g = ctx.createLinearGradient(0, 0, 0, h);
+                const baseA = 16 + Math.floor(8 * Math.sin(t * 2));
+                g.addColorStop(0, `rgba(${30 + baseA},${12 + baseA},${40 + baseA},1)`);
+                g.addColorStop(1, `rgba(${8 + baseA},${6 + baseA},${18 + baseA},1)`);
+                ctx.fillStyle = g;
+                ctx.fillRect(0, 0, w, h);
+
+                // Scanning horizontal lines
+                ctx.globalCompositeOperation = 'lighter';
+                ctx.fillStyle = 'rgba(255,255,255,0.02)';
+                const lines = 24;
+                for (let i = 0; i < lines; i++) {
+                    const yy = ((i / lines) * h) + (Math.sin(t * 3 + i) * 4);
+                    ctx.fillRect(0, yy, w, 1.2);
+                }
+                ctx.globalCompositeOperation = 'source-over';
+
+                // Rotating loading arc (spinner)
+                const cx = w * 0.5, cy = h * 0.5, r = Math.min(w, h) * 0.12;
+                ctx.beginPath();
+                ctx.strokeStyle = 'rgba(200,240,255,0.95)';
+                ctx.lineWidth = Math.max(2, w * 0.008);
+                ctx.arc(cx, cy, r, t * 2, t * 2 + Math.PI * 1.5);
+                ctx.stroke();
+
+                // Pulse center dot
+                ctx.beginPath();
+                ctx.fillStyle = `rgba(100,220,255,${0.5 + 0.5 * Math.sin(t * 6)})`;
+                ctx.arc(cx, cy, Math.max(2, w * 0.005) + 2 * Math.abs(Math.sin(t * 3)), 0, Math.PI * 2);
+                ctx.fill();
+
+                // Subtle static noise blocks for "analog" feel
+                ctx.globalAlpha = 0.07;
+                for (let i = 0; i < 80; i++) {
+                    const nx = Math.random() * w, ny = Math.random() * h, nw = Math.random() * 6, nh = Math.random() * 3;
+                    ctx.fillStyle = `rgba(255,255,255,${Math.random()})`;
+                    ctx.fillRect(nx, ny, nw, nh);
+                }
+                ctx.globalAlpha = 1.0;
+
+                // Small caption
+                ctx.fillStyle = 'rgba(180,220,255,0.9)';
+                ctx.font = `${Math.max(12, Math.round(w * 0.03))}px monospace`;
+                ctx.textAlign = 'center';
+                ctx.fillText('LOADING • 3D CHANNEL', cx, h - 26);
+
+                tvLoadingTexture.needsUpdate = true;
+
+                // Fade out when video starts playing
+                if (!tvLoadingActive) {
+                    tvLoadingMesh.material.opacity = Math.max(0, tvLoadingMesh.material.opacity - TV_LOADING_FADE_SPEED);
+                    if (tvLoadingMesh.material.opacity <= 0.001) {
+                        tvLoadingMesh.visible = false;
+                    }
+                }
             }
 
             if (cityCtx) {
