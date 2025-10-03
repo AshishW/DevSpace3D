@@ -1,0 +1,659 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>3D Programmer's Apartment</title>
+    <style>
+        body { margin: 0; background-color: #0a0a1a; overflow: hidden; }
+        canvas { display: block; }
+        /* Hide the video element, it's only used as a source for the texture */
+        #tvVideo {
+            position: absolute;
+            width: 2px;
+            height: 2px;
+            opacity: 0;
+            pointer-events: none;
+            left: -9999px;
+        }
+    </style>
+</head>
+<body>
+    <!-- Hidden video element for the TV texture -->
+    <video id="tvVideo" autoplay loop muted playsinline crossorigin="anonymous">
+        <!-- Replace this with a direct link to a public domain Tom & Jerry MP4 video -->
+        <!-- <source src="https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4" type="video/mp4"> -->
+        <source src="./Brementown Musicians UB Iwerks ComiColor.mp4" type="video/mp4">
+        Your browser does not support the video tag.
+    </video>
+
+    <script type="importmap">
+        {
+            "imports": {
+                "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+            }
+        }
+    </script>
+    <script type="module">
+        import * as THREE from 'three';
+        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
+        import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
+        import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
+        import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
+        import { FontLoader } from 'three/addons/loaders/FontLoader.js';
+        import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+
+        let scene, camera, renderer, composer, controls;
+        let cityCanvas, cityCtx, cityTexture;
+        let bgCanvas, bgCtx;
+        let snowflakes = [];
+        let tvVideoElement, tvVideoTexture;
+
+
+        // --- CONSTANTS ---
+        const DESK_SURFACE_Y = 3.25;
+        const NEON_BLUE = 0x00bfff;
+        const NEON_PINK = 0xff00ff;
+        const NEON_CYAN = 0x00ffff;
+        const WARM_WHITE = 0xfff5e1;
+        const WALL_HEIGHT = 10;
+        const ROOM_WIDTH = 15;
+        const ROOM_DEPTH = 30; // Increased depth for living room
+
+        // --- MATERIALS ---
+        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x2e2e48, roughness: 0.9 });
+        const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.4 });
+        const deskMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.8 });
+
+        // --- OFFICE HELPER FUNCTIONS ---
+        function createDrawerUnit(position) {
+            const group = new THREE.Group();
+            const casingMaterial = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, roughness: 0.8 });
+            const handleMaterial = new THREE.MeshStandardMaterial({ color: 0x333333 });
+            const casing = new THREE.Mesh(new THREE.BoxGeometry(2, 3, 2.8), casingMaterial);
+            group.add(casing);
+            for (let i = 0; i < 3; i++) {
+                const drawerFront = new THREE.Mesh(new THREE.BoxGeometry(1.8, 0.9, 0.1), casingMaterial);
+                drawerFront.position.set(0, 1 - (i * 1), 1.45);
+                group.add(drawerFront);
+                const handle = new THREE.Mesh(new THREE.BoxGeometry(0.6, 0.1, 0.1), handleMaterial);
+                handle.position.set(0, 1 - (i * 1), 1.55);
+                group.add(handle);
+            }
+            group.position.copy(position);
+            return group;
+        }
+
+        function createPlantPot() {
+            const group = new THREE.Group();
+            const potMaterial = new THREE.MeshStandardMaterial({ color: 0xf0f0f0, roughness: 0.8 });
+            const plantMaterial = new THREE.MeshStandardMaterial({ color: 0x4caf50, roughness: 0.6 });
+            const pot = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.15, 0.3, 12), potMaterial);
+            group.add(pot);
+            const foliageGroup = new THREE.Group();
+            for (let i = 0; i < 15; i++) {
+                const leaf = new THREE.Mesh(new THREE.SphereGeometry(0.08, 8, 8), plantMaterial);
+                const phi = Math.acos(-1 + (2 * i) / 15);
+                const theta = Math.sqrt(15 * Math.PI) * phi;
+                leaf.position.set(Math.cos(theta) * Math.sin(phi) * 0.2, Math.sin(theta) * Math.sin(phi) * 0.2, Math.cos(phi) * 0.2);
+                foliageGroup.add(leaf);
+            }
+            foliageGroup.position.y = 0.35;
+            group.add(foliageGroup);
+            group.scale.set(0.8, 0.8, 0.8);
+            return group;
+        }
+
+        function createKeyboard() {
+            const keyboardGroup = new THREE.Group();
+            const keyMaterial = new THREE.MeshStandardMaterial({ map: createKeyboardTexture() });
+            const bodyMaterial = new THREE.MeshStandardMaterial({color: 0x1a1a1a});
+            const body = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.1, 1), bodyMaterial);
+            const keys = new THREE.Mesh(new THREE.PlaneGeometry(2.4, 0.9), keyMaterial);
+            keys.position.y = 0.051;
+            keys.rotation.x = -Math.PI / 2;
+            keyboardGroup.add(body, keys);
+            return keyboardGroup;
+        }
+
+        function createMouse() {
+             const mouseMaterial = new THREE.MeshStandardMaterial({ color: 0x1a1a1a, roughness: 0.4 });
+             const mouse = new THREE.Mesh(new THREE.CapsuleGeometry(0.2, 0.3, 4, 16), mouseMaterial);
+             mouse.rotation.x = -Math.PI / 2;
+             mouse.scale.set(1, 1, 0.7);
+             return mouse;
+        }
+
+        function createOfficeChair() {
+            const chairGroup = new THREE.Group();
+            const seatMaterial = new THREE.MeshStandardMaterial({ color: 0x282828, roughness: 0.6 });
+            const baseHub = new THREE.Mesh(new THREE.CylinderGeometry(0.3, 0.3, 0.1, 16), darkMaterial);
+            baseHub.position.y = 0.25;
+            chairGroup.add(baseHub);
+            for (let i = 0; i < 5; i++) {
+                const angle = (i / 5) * Math.PI * 2;
+                const leg = new THREE.Mesh(new THREE.BoxGeometry(1.2, 0.1, 0.2), darkMaterial);
+                leg.position.set(Math.cos(angle) * 0.5, 0.2, Math.sin(angle) * 0.5);
+                leg.rotation.y = -angle;
+                chairGroup.add(leg);
+                const wheel = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 0.3, 8), darkMaterial);
+                wheel.rotation.x = Math.PI / 2;
+                wheel.position.set(Math.cos(angle) * 1.1, 0.15, Math.sin(angle) * 1.1);
+                chairGroup.add(wheel);
+            }
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.15, 0.15, 1.5, 16), darkMaterial);
+            stem.position.y = 1.0; chairGroup.add(stem);
+            const seat = new THREE.Mesh(new THREE.BoxGeometry(1.5, 0.3, 1.5), seatMaterial);
+            seat.position.y = 1.8; chairGroup.add(seat);
+            const backrest = new THREE.Mesh(new THREE.BoxGeometry(1.4, 2.2, 0.2), seatMaterial);
+            backrest.position.set(0, 3, 0.7); backrest.rotation.x = -0.1; chairGroup.add(backrest);
+            for (let i = -1; i <= 1; i += 2) {
+                const armrestGroup = new THREE.Group();
+                const vertical = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.7, 0.15), darkMaterial);
+                vertical.position.y = 0.35;
+                const horizontal = new THREE.Mesh(new THREE.BoxGeometry(0.15, 0.15, 1.2), darkMaterial);
+                horizontal.position.set(0, 0.7, -0.4);
+                armrestGroup.add(vertical, horizontal);
+                armrestGroup.position.set(i * 0.8, 1.8, 0);
+                chairGroup.add(armrestGroup);
+            }
+            return chairGroup;
+        }
+
+        function createCuteOctopus() {
+            const octopusGroup = new THREE.Group();
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0x77aaff, roughness: 0.2 });
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: 0x000000 });
+            const body = new THREE.Mesh(new THREE.SphereGeometry(0.4, 32, 16), bodyMaterial);
+            body.position.y = 0.4; octopusGroup.add(body);
+            const eye1 = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), eyeMaterial);
+            eye1.position.set(0.2, 0.5, 0.3); octopusGroup.add(eye1);
+            const eye2 = new THREE.Mesh(new THREE.SphereGeometry(0.06, 16, 16), eyeMaterial);
+            eye2.position.set(-0.2, 0.5, 0.3); octopusGroup.add(eye2);
+            for(let i = 0; i < 8; i++) {
+                const angle = (i / 8) * Math.PI * 2;
+                const tentacle = new THREE.Mesh(new THREE.CylinderGeometry(0.08, 0.04, 0.5, 8), bodyMaterial);
+                tentacle.position.set(Math.cos(angle) * 0.3, 0.1, Math.sin(angle) * 0.3);
+                tentacle.rotation.x = Math.PI / 2.5;
+                tentacle.rotation.z = -angle;
+                octopusGroup.add(tentacle);
+            }
+            return octopusGroup;
+        }
+
+        // --- ** LIVING ROOM HELPER FUNCTIONS ** ---
+        function createSofa() {
+            const sofaGroup = new THREE.Group();
+            const sofaMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a4a, roughness: 0.8 });
+            const base = new THREE.Mesh(new THREE.BoxGeometry(8, 1.5, 3.5), sofaMaterial);
+            base.position.y = 0.75;
+            sofaGroup.add(base);
+            const back = new THREE.Mesh(new THREE.BoxGeometry(8, 2, 1), sofaMaterial);
+            back.position.set(0, 2.5, -1.25);
+            sofaGroup.add(back);
+            const cushionMaterial = new THREE.MeshStandardMaterial({ color: 0x4a4a5a, roughness: 0.7 });
+            for (let i = 0; i < 3; i++) {
+                const seatCushion = new THREE.Mesh(new THREE.BoxGeometry(2.5, 0.4, 2.8), cushionMaterial);
+                seatCushion.position.set(-2.6 + i * 2.6, 1.7, 0.1);
+                sofaGroup.add(seatCushion);
+            }
+            for (let i = 0; i < 2; i++) {
+                const armRest = new THREE.Mesh(new THREE.BoxGeometry(1, 1, 3.5), sofaMaterial);
+                armRest.position.set(-4.5 + i * 9, 2, 0);
+                sofaGroup.add(armRest);
+            }
+            return sofaGroup;
+        }
+
+        function createCoffeeTable() {
+            const tableGroup = new THREE.Group();
+            const frameMaterial = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.5 });
+            const topFrame = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.2, 2.5), frameMaterial);
+            topFrame.position.y = 1;
+            tableGroup.add(topFrame);
+
+            for (let x = -1; x <= 1; x += 2) {
+                for (let z = -1; z <= 1; z += 2) {
+                    const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1, 0.2), frameMaterial);
+                    leg.position.set(x * 2.1, 0.5, z * 1.1);
+                    tableGroup.add(leg);
+                }
+            }
+            const glassMaterial = new THREE.MeshStandardMaterial({
+                color: 0xeeeeff, transparent: true, opacity: 0.2, roughness: 0.1,
+            });
+            const glassTop = new THREE.Mesh(new THREE.PlaneGeometry(4.3, 2.3), glassMaterial);
+            glassTop.rotation.x = -Math.PI / 2;
+            glassTop.position.y = 1.11;
+            tableGroup.add(glassTop);
+            return tableGroup;
+        }
+
+        function createTVConsole() {
+            const consoleGroup = new THREE.Group();
+            const consoleMaterial = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.8 });
+            const body = new THREE.Mesh(new THREE.BoxGeometry(8, 1.2, 2), consoleMaterial);
+            consoleGroup.add(body);
+
+            // TV Screen
+            // Use the video texture for the TV screen
+            // mark the TV material as not toneMapped so renderer toneMapping / exposure / bloom don't push it too bright
+            const tvScreenMaterial = new THREE.MeshBasicMaterial({ map: tvVideoTexture, toneMapped: false });
+            const tvFrame = new THREE.Mesh(new THREE.BoxGeometry(6.5, 3.7, 0.2), darkMaterial);
+            const tvScreen = new THREE.Mesh(new THREE.BoxGeometry(6.3, 3.5, 0.1), tvScreenMaterial);
+            tvScreen.position.z = 0.06;
+            tvFrame.add(tvScreen);
+            tvFrame.position.y = 0.6 + (3.7 / 2);
+            consoleGroup.add(tvFrame);
+            return consoleGroup;
+        }
+
+        function createFloorLamp() {
+            const lampGroup = new THREE.Group();
+            const lampMaterial = new THREE.MeshStandardMaterial({ color: 0x222222, roughness: 0.3 });
+            const base = new THREE.Mesh(new THREE.CylinderGeometry(0.5, 0.5, 0.1, 32), lampMaterial);
+            lampGroup.add(base);
+            const stem = new THREE.Mesh(new THREE.CylinderGeometry(0.05, 0.05, 5, 16), lampMaterial);
+            stem.position.y = 2.5;
+            lampGroup.add(stem);
+            const shadeMaterial = new THREE.MeshStandardMaterial({ color: WARM_WHITE, roughness: 0.9 });
+            const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 1, 32, 1, true), shadeMaterial);
+            shade.position.y = 5;
+            lampGroup.add(shade);
+            const light = new THREE.PointLight(WARM_WHITE, 15, 12, 1.0);
+            light.position.y = 5;
+            lampGroup.add(light);
+            return lampGroup;
+        }
+
+        // --- CANVAS TEXTURE FUNCTIONS ---
+        function setupCitySceneAndTexture() {
+            cityCanvas = document.createElement('canvas'); cityCtx = cityCanvas.getContext('2d');
+            cityCanvas.width = 256; cityCanvas.height = 512;
+            bgCanvas = document.createElement('canvas'); bgCtx = bgCanvas.getContext('2d');
+            bgCanvas.width = cityCanvas.width; bgCanvas.height = cityCanvas.height;
+            const gradient = bgCtx.createLinearGradient(0, 0, 0, bgCanvas.height);
+            gradient.addColorStop(0, '#1c0c2a'); gradient.addColorStop(1, '#6d1a6d');
+            bgCtx.fillStyle = gradient; bgCtx.fillRect(0, 0, bgCanvas.width, bgCanvas.height);
+            for (let i = 0; i < 30; i++) {
+                const x = Math.random() * bgCanvas.width; const y = bgCanvas.height * (0.2 + Math.random() * 0.8);
+                const w = 15 + Math.random() * 30; const h = bgCanvas.height - y;
+                bgCtx.fillStyle = `rgba(10, 5, 15, ${0.7 + Math.random() * 0.3})`;
+                bgCtx.fillRect(x, y, w, h);
+                for (let lightX = x + 3; lightX < x + w - 3; lightX += 6) {
+                    for (let lightY = y + 3; lightY < y + h - 3; lightY += 8) {
+                        if (Math.random() > 0.75) {
+                            bgCtx.fillStyle = `rgba(255, 229, 180, ${0.8 + Math.random() * 0.2})`;
+                            bgCtx.fillRect(lightX, lightY, 2, 3);
+                        }
+                    }
+                }
+            }
+            for (let i = 0; i < 150; i++) {
+                snowflakes.push({ x: Math.random() * cityCanvas.width, y: Math.random() * cityCanvas.height, radius: Math.random() * 1.5 + 0.5, speed: Math.random() * 0.3 + 0.2 });
+            }
+            cityTexture = new THREE.CanvasTexture(cityCanvas);
+        }
+
+        function createKeyboardTexture() {
+            const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 128;
+            const ctx = canvas.getContext('2d'); ctx.fillStyle = '#1e1e1e'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#4a4a4a'; ctx.font = '10px sans-serif';
+            const keyWidth = 18, keyHeight = 18, keyGap = 4, top_offset = 10, left_offset = 10;
+            const rows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
+            for(let r=0; r < rows.length; r++) {
+                for (let i = 0; i < rows[r].length; i++) {
+                    const x = left_offset + i * (keyWidth + keyGap) + (r * 10); const y = top_offset + r * (keyHeight + keyGap);
+                    ctx.fillRect(x, y, keyWidth, keyHeight); ctx.fillStyle = '#dddddd'; ctx.fillText(rows[r][i], x + 5, y + 13); ctx.fillStyle = '#4a4a4a';
+                }
+            }
+            ctx.fillRect(left_offset + 2 * (keyWidth + keyGap) + 20, top_offset + 3 * (keyHeight + keyGap), 120, keyHeight);
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createCodeScreenMaterial() {
+            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256;
+            const ctx = canvas.getContext('2d'); ctx.fillStyle = '#1e1e1e'; ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#252526'; ctx.fillRect(0, 0, 80, canvas.height); ctx.fillStyle = '#2d2d2d'; ctx.fillRect(80, 0, canvas.width - 80, 30);
+            ctx.fillStyle = '#cccccc'; ctx.font = '14px sans-serif'; ctx.fillText('scene.js', 95, 20);
+            const code = ["// ... existing code ...","function animate() {","  requestAnimationFrame(animate);","  controls.update();","  composer.render();","}","","init();","animate();"];
+            ctx.font = '16px monospace';
+            for (let i = 0; i < code.length; i++) {
+                const y = 55 + i * 20; ctx.fillStyle = '#858585'; ctx.fillText((i + 1).toString().padStart(2, ' '), 90, y);
+                if (code[i].includes('function') || code[i].includes('const')) { ctx.fillStyle = '#569cd6'; }
+                else if (code[i].startsWith('//')) { ctx.fillStyle = '#6a9955'; }
+                else { ctx.fillStyle = '#d4d4d4'; }
+                ctx.fillText(code[i], 130, y);
+            }
+            return new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), emissive: 0xffffff, emissiveMap: new THREE.CanvasTexture(canvas), emissiveIntensity: 0.8, toneMapped: false });
+        }
+
+        function createRugTexture(color1, color2, text) {
+            const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
+            const ctx = canvas.getContext('2d'); ctx.fillStyle = color1; ctx.fillRect(0, 0, 256, 256);
+            ctx.font = '8px monospace'; ctx.fillStyle = color2;
+            for(let i=0; i < 256; i+=10) {
+                for(let j=0; j < 256; j+=10) {
+                    ctx.fillText(text(), i, j);
+                }
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function init() {
+            // --- 1. SCENE FOUNDATION & CAMERA ---
+            scene = new THREE.Scene();
+            scene.background = new THREE.Color(0x101018);
+            const aspect = window.innerWidth / window.innerHeight;
+            const d = 15;
+            camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
+            camera.position.set(20, 20, 20);
+            camera.lookAt(scene.position);
+            renderer = new THREE.WebGLRenderer({ antialias: true });
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            renderer.setPixelRatio(window.devicePixelRatio);
+            renderer.toneMapping = THREE.ACESFilmicToneMapping;
+            renderer.toneMappingExposure = 1.1;
+            renderer.outputColorSpace = THREE.SRGBColorSpace;
+            document.body.appendChild(renderer.domElement);
+            controls = new OrbitControls(camera, renderer.domElement);
+            controls.enableDamping = true;
+            controls.dampingFactor = 0.05;
+            controls.target.set(0, 2.5, 0);
+
+            // Get the video element and create a VideoTexture
+            tvVideoElement = document.getElementById('tvVideo');
+
+            // Playlist for the TV: replace these paths / URLs with your videos
+            const tvPlaylist = [
+                './videos/PopeyeAliBaba_512kb.mp4',
+                './videos/Brementown Musicians UB Iwerks ComiColor.mp4',
+                './videos/TheCrystalBrawl_512kb.mp4'
+            ];
+            let tvPlaylistIndex = 0;
+
+            function playTvIndex(i) {
+                tvPlaylistIndex = ((i % tvPlaylist.length) + tvPlaylist.length) % tvPlaylist.length;
+                tvVideoElement.src = tvPlaylist[tvPlaylistIndex];
+                tvVideoElement.load();
+                tvVideoElement.muted = true;
+                const p = tvVideoElement.play();
+                if (p !== undefined) {
+                    p.catch(() => {
+                        // Autoplay blocked: resume on first user interaction
+                        const resume = () => { tvVideoElement.play().catch(()=>{}); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
+                        window.addEventListener('pointerdown', resume);
+                        window.addEventListener('keydown', resume);
+                    });
+                }
+            }
+
+            // Advance to next video when one ends or errors, loop back automatically
+            tvVideoElement.addEventListener('ended', () => playTvIndex(tvPlaylistIndex + 1));
+            tvVideoElement.addEventListener('error', () => playTvIndex(tvPlaylistIndex + 1));
+
+            // create the three.js VideoTexture that will follow the <video> element
+            tvVideoTexture = new THREE.VideoTexture(tvVideoElement);
+            // safer defaults for filtering/format/encoding
+            tvVideoTexture.minFilter = THREE.LinearFilter;
+            tvVideoTexture.magFilter = THREE.LinearFilter;
+            tvVideoTexture.format = THREE.RGBAFormat;
+            // ensure correct color space for video (prevents over-brightening)
+            if (THREE.sRGBEncoding) tvVideoTexture.encoding = THREE.sRGBEncoding;
+            tvVideoTexture.needsUpdate = true;
+
+            // start the playlist
+            playTvIndex(0);
+
+            // lower exposure slightly to reduce extra brightness from bloom/toneMapping
+            renderer.toneMappingExposure = 1.0;
+
+            // Try to play the video (autoplay may be blocked — handle promise)
+            tvVideoElement.muted = true; // ensure autoplay allowed on most browsers
+            const playPromise = tvVideoElement.play();
+            if (playPromise !== undefined) {
+                playPromise.catch((err) => {
+                    console.warn('Video autoplay blocked, will try after user interaction:', err);
+                    const resume = () => { tvVideoElement.play().catch(()=>{}); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
+                    window.addEventListener('pointerdown', resume);
+                    window.addEventListener('keydown', resume);
+                });
+            }
+
+
+            // --- POST-PROCESSING (BLOOM) --- // modify bloomPass.strength for changes to brightness in video
+            const renderScene = new RenderPass(scene, camera);
+            const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
+            bloomPass.threshold = 0.1; bloomPass.strength = 0.2; bloomPass.radius = 0.5;
+            composer = new EffectComposer(renderer);
+            composer.addPass(renderScene);
+            composer.addPass(bloomPass);
+
+            // --- 2. ROOM GEOMETRY ---
+            setupCitySceneAndTexture();
+
+            const floor = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, 0.2, ROOM_DEPTH), new THREE.MeshStandardMaterial({ color: 0x3a3a5a }));
+            scene.add(floor);
+
+            const backWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, WALL_HEIGHT, 0.2), wallMaterial);
+            backWall.position.set(0, WALL_HEIGHT / 2, -ROOM_DEPTH / 2);
+            scene.add(backWall);
+
+            const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, ROOM_DEPTH), wallMaterial);
+            leftWall.position.set(-ROOM_WIDTH / 2, WALL_HEIGHT / 2, 0);
+            scene.add(leftWall);
+
+            // Partition wall with a doorway
+            const partitionZ = 0;
+            const doorWidth = 3.5;
+            const doorHeight = 7;
+            const wallSectionWidth1 = (ROOM_WIDTH / 2) - (doorWidth / 2);
+            const wallSection1 = new THREE.Mesh(new THREE.BoxGeometry(wallSectionWidth1, WALL_HEIGHT, 0.2), wallMaterial);
+            wallSection1.position.set(-ROOM_WIDTH / 2 + wallSectionWidth1 / 2, WALL_HEIGHT / 2, partitionZ);
+            scene.add(wallSection1);
+            const wallSection2 = new THREE.Mesh(new THREE.BoxGeometry(wallSectionWidth1, WALL_HEIGHT, 0.2), wallMaterial);
+            wallSection2.position.set(ROOM_WIDTH / 2 - wallSectionWidth1 / 2, WALL_HEIGHT / 2, partitionZ);
+            scene.add(wallSection2);
+            const wallHeader = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, WALL_HEIGHT - doorHeight, 0.2), wallMaterial);
+            wallHeader.position.set(0, doorHeight + (WALL_HEIGHT - doorHeight) / 2, partitionZ);
+            scene.add(wallHeader);
+
+            // Door with handles
+            const door = new THREE.Mesh(new THREE.BoxGeometry(doorWidth - 0.2, doorHeight - 0.1, 0.1), darkMaterial);
+            const handleMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3 });
+            const handleGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.15);
+            const handle1 = new THREE.Mesh(handleGeometry, handleMaterial);
+            const handleX = (doorWidth - 0.2) / 2 - 0.4; // Position from door's center
+            handle1.position.set(handleX, 0, 0.1); // Front side
+            door.add(handle1);
+            const handle2 = new THREE.Mesh(handleGeometry, handleMaterial);
+            handle2.position.set(handleX, 0, -0.1); // Back side
+            door.add(handle2);
+
+            door.position.set(doorWidth / 2 - 0.1, doorHeight / 2, 0);
+            const doorGroup = new THREE.Group();
+            doorGroup.add(door);
+            doorGroup.position.set(-doorWidth / 2, 0, partitionZ);
+            doorGroup.rotation.y = Math.PI / 8;
+            scene.add(doorGroup);
+
+            const windowFrame = new THREE.Group();
+            windowFrame.add(new THREE.Mesh(new THREE.BoxGeometry(5, 5.5, 0.25), new THREE.MeshStandardMaterial({color: 0x111111})));
+            const cityView = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 5), new THREE.MeshBasicMaterial({ map: cityTexture, side: THREE.DoubleSide }));
+            cityView.position.z = 0.13;
+            windowFrame.add(cityView);
+            windowFrame.position.set(4, 6, -ROOM_DEPTH/2 + 0.2);
+            scene.add(windowFrame);
+
+            // --- 3. OFFICE FURNITURE & TECH ---
+            const deskTop = new THREE.Mesh(new THREE.BoxGeometry(10, 0.3, 3), deskMaterial);
+            deskTop.position.set(0, 3, -13.5); scene.add(deskTop);
+            const drawerUnit1 = createDrawerUnit(new THREE.Vector3(-4.5, 1.6, -13.5)); scene.add(drawerUnit1);
+            const drawerUnit2 = createDrawerUnit(new THREE.Vector3(4.5, 1.6, -13.5)); scene.add(drawerUnit2);
+            const pcPedestal = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.2, 3.2), new THREE.MeshStandardMaterial({color: 0x111111}));
+            pcPedestal.position.set(6, 0.2, -13.2); scene.add(pcPedestal);
+            const pcCase = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3.5, 3), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
+            pcCase.position.set(6, 2.05, -13.2); scene.add(pcCase);
+
+            function createMonitor(x, z, rotationY) {
+                const monitorGroup = new THREE.Group();
+                const monitorFrame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.1, 0.15), darkMaterial);
+                monitorGroup.add(monitorFrame);
+                const monitorScreen = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2, 0.1), createCodeScreenMaterial());
+                monitorScreen.position.z = 0.03; monitorGroup.add(monitorScreen);
+                const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 16), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+                stand.position.y = -1.3; monitorGroup.add(stand);
+                monitorGroup.position.set(x, DESK_SURFACE_Y + 1.05, z);
+                monitorGroup.rotation.y = rotationY;
+                scene.add(monitorGroup);
+            }
+            createMonitor(-0.5, -14.2, 0);
+            createMonitor(3.3, -13.7, -Math.PI / 8);
+            createMonitor(-4.3, -13.7, Math.PI / 8);
+
+            const chair = createOfficeChair(); chair.position.set(-1.5, 0.1, -10.5); chair.rotation.y = Math.PI / 1.1; scene.add(chair);
+            const octopus = createCuteOctopus(); octopus.position.set(-3.5, DESK_SURFACE_Y, -12.8); octopus.rotation.y = Math.PI / 4; scene.add(octopus);
+            const keyboard = createKeyboard(); keyboard.position.set(-0.5, DESK_SURFACE_Y, -12.9); keyboard.rotation.y = 0.05; scene.add(keyboard);
+            const mouse = createMouse(); mouse.position.set(1.5, DESK_SURFACE_Y, -12.8); mouse.rotation.y = -Math.PI / 12; scene.add(mouse);
+
+            // Office Rug
+            const officeRug = new THREE.Mesh(new THREE.PlaneGeometry(8, 6), new THREE.MeshStandardMaterial({map: createRugTexture('#2a2a3a', 'rgba(0, 191, 255, 0.4)', () => Math.random() > 0.5 ? '1' : '0')}));
+            officeRug.rotation.x = -Math.PI / 2; officeRug.position.set(-1, 0.11, -10); scene.add(officeRug);
+
+            // Posters and Shelves
+            const shelfMaterial = new THREE.MeshStandardMaterial({color: 0x1a1a1a});
+            const shelf1 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 1.5), shelfMaterial);
+            shelf1.position.set(-6.5, 8.5, -3.5); shelf1.rotation.y = Math.PI / 2; scene.add(shelf1);
+            const shelf2 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 1.5), shelfMaterial);
+            shelf2.position.set(-6.5, 7, -3.5); shelf2.rotation.y = Math.PI / 2; scene.add(shelf2);
+
+            const plant1 = createPlantPot();
+            plant1.position.set(-6.5, 8.6, -2.5);
+            scene.add(plant1);
+            const plant2 = createPlantPot();
+            plant2.position.set(-6.5, 8.6, -3.5);
+            scene.add(plant2);
+            const plant3 = createPlantPot();
+            plant3.position.set(-6.5, 8.6, -4.5);
+            scene.add(plant3);
+            const plant4 = createPlantPot();
+            plant4.position.set(-6.5, 7.1, -3.5);
+            scene.add(plant4);
+
+            function createPoster(imageUrl, position, size, rotationY = 0) {
+                const posterMaterial = new THREE.MeshStandardMaterial({ map: new THREE.TextureLoader().load(imageUrl), color: 0xcccccc });
+                const poster = new THREE.Mesh(new THREE.PlaneGeometry(size.w, size.h), posterMaterial);
+                poster.position.set(position.x, position.y, position.z);
+                poster.rotation.y = rotationY;
+                scene.add(poster);
+            }
+            createPoster('https://placehold.co/400x600/000000/FFFFFF?text=CODE', {x: -1, y: 7, z: -14.8}, {w: 2.5, h: 3.5});
+            createPoster('https://placehold.co/400x300/000000/FFFFFF?text=JS', {x: -7.2, y: 4.5, z: -13.5}, {w: 2.5, h: 1.8}, Math.PI/2);
+            createPoster('https://placehold.co/300x400/000000/FFFFFF?text=UI/UX', {x: -7.2, y: 4.5, z: -10.5}, {w: 1.8, h: 2.5}, Math.PI/2);
+            createPoster('https://placehold.co/300x400/000000/FFFFFF?text=SYNTH', {x: -4, y: 8, z: -14.8}, {w: 1.8, h: 2.5});
+
+            // --- 4. LIVING ROOM FURNITURE (UPDATED) ---
+            const sofa = createSofa();
+            sofa.position.set(3, 0.1, 8);
+            sofa.rotation.y = -Math.PI / 2;
+            scene.add(sofa);
+
+            const coffeeTable = createCoffeeTable();
+            coffeeTable.position.set(-1.5, 0.1, 8);
+            coffeeTable.rotation.y = Math.PI / 2;
+            scene.add(coffeeTable);
+
+            const tvConsole = createTVConsole();
+            tvConsole.position.set(-6.5, 0.6 + 0.1, 8);
+            tvConsole.rotation.y = Math.PI / 2;
+            scene.add(tvConsole);
+
+            const livingRoomLamp = createFloorLamp();
+            livingRoomLamp.position.set(-6.5, 0.1, 3);
+            scene.add(livingRoomLamp);
+
+            const livingRoomRug = new THREE.Mesh(new THREE.PlaneGeometry(10, 12), new THREE.MeshStandardMaterial({ map: createRugTexture('#4a3a3a', 'rgba(255, 0, 255, 0.4)', () => ['<>', '{}', '/>', '[]'][Math.floor(Math.random()*4)])}));
+            livingRoomRug.rotation.x = -Math.PI / 2; livingRoomRug.position.set(-1, 0.11, 8); scene.add(livingRoomRug);
+
+
+            // --- 5. LIGHTING & DETAILS ---
+            scene.add(new THREE.AmbientLight(0xffffff, 0.5));
+            scene.add(new THREE.HemisphereLight(NEON_BLUE, NEON_PINK, 1.8));
+            const deskLight = new THREE.PointLight(NEON_BLUE, 3, 15, 1.0); deskLight.position.set(-1, 0.5, -12.5); scene.add(deskLight);
+            const windowLight = new THREE.PointLight(NEON_PINK, 15, 20, 1); windowLight.position.set(4, 5, -13); scene.add(windowLight);
+            const syntaxLight = new THREE.PointLight(NEON_CYAN, 5, 18, 1.2); syntaxLight.position.set(-7, 8, -10); scene.add(syntaxLight);
+
+            function createEmissiveBox(color, intensity, position, size) {
+                const material = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: intensity });
+                const box = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), material);
+                box.position.copy(position); scene.add(box);
+            }
+            createEmissiveBox(NEON_BLUE, 5, new THREE.Vector3(5, 3.1, -13.5), {x: 0.1, y: 0.1, z: 3});
+            createEmissiveBox(NEON_BLUE, 3, new THREE.Vector3(-7.4, 0.2, 0), {x: 0.1, y: 0.1, z: ROOM_DEPTH});
+            createEmissiveBox(NEON_BLUE, 3, new THREE.Vector3(0, 0.2, -14.9), {x: ROOM_WIDTH, y: 0.1, z: 0.1});
+
+            const fanMaterial = new THREE.MeshStandardMaterial({color: NEON_PINK, emissive: NEON_PINK, emissiveIntensity: 5});
+            for(let i = 0; i < 3; i++) {
+                const fan = new THREE.Mesh(new THREE.CircleGeometry(0.3, 32), fanMaterial);
+                fan.position.set(5.25, 1.2 + i * 0.8, -13.2); fan.rotation.y = Math.PI/2; scene.add(fan);
+            }
+
+            const fontLoader = new FontLoader();
+            fontLoader.load('https://cdn.jsdelivr.net/npm/three@0.164.1/examples/fonts/helvetiker_bold.typeface.json', (font) => {
+                const textMaterial = new THREE.MeshStandardMaterial({color: NEON_CYAN, emissive: NEON_CYAN, emissiveIntensity: 8});
+                const textGeo1 = new TextGeometry('SYNTAX', { font, size: 0.8, height: 0.1 });
+                const textMesh1 = new THREE.Mesh(textGeo1, textMaterial);
+                textMesh1.position.set(-7.4, 8.5, -10.5); textMesh1.rotation.y = Math.PI / 2; scene.add(textMesh1);
+                const textGeo2 = new TextGeometry('ERROR', { font, size: 0.8, height: 0.1 });
+                const textMesh2 = new THREE.Mesh(textGeo2, textMaterial);
+                textMesh2.position.set(-7.4, 7.5, -10); textMesh2.rotation.y = Math.PI / 2; scene.add(textMesh2);
+            });
+
+            window.addEventListener('resize', onWindowResize, false);
+        }
+
+        function onWindowResize() {
+            const aspect = window.innerWidth / window.innerHeight;
+            const d = 15;
+            camera.left = -d * aspect; camera.right = d * aspect;
+            camera.top = d; camera.bottom = -d;
+            camera.updateProjectionMatrix();
+            renderer.setSize(window.innerWidth, window.innerHeight);
+            composer.setSize(window.innerWidth, window.innerHeight);
+        }
+
+        function animate() {
+            requestAnimationFrame(animate);
+            controls.update();
+
+            // Update the video texture if the video is playing
+            if (tvVideoElement && tvVideoElement.readyState >= tvVideoElement.HAVE_CURRENT_DATA) {
+                tvVideoTexture.needsUpdate = true;
+            }
+
+            if (cityCtx) {
+                cityCtx.drawImage(bgCanvas, 0, 0);
+                cityCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
+                cityCtx.beginPath();
+                for (const flake of snowflakes) {
+                    flake.y += flake.speed;
+                    if (flake.y > cityCanvas.height) {
+                        flake.y = -5;
+                        flake.x = Math.random() * cityCanvas.width;
+                    }
+                    cityCtx.moveTo(flake.x, flake.y);
+                    cityCtx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
+                }
+                cityCtx.fill();
+                cityTexture.needsUpdate = true;
+            }
+
+            composer.render();
+        }
+
+        init();
+        animate();
+    </script></body>
+</html>
+
