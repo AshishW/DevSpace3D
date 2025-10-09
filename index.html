@@ -1192,7 +1192,6 @@
             screen.updateWorldMatrix(true, false);
             const box = new THREE.Box3().setFromObject(screen);
 
-            // Bottom-left and top-right corners of the monitor surface (world space)
             const corners = [
                 new THREE.Vector3(box.min.x, box.min.y, box.max.z), // Bottom-left
                 new THREE.Vector3(box.max.x, box.max.y, box.max.z)  // Top-right
@@ -1207,31 +1206,23 @@
             });
 
             const [bottomLeft, topRight] = screenCorners;
-
-            // Monitor pixel width/height on the user's screen
             const screenPixelWidth = Math.abs(topRight.x - bottomLeft.x);
             const screenPixelHeight = Math.abs(bottomLeft.y - topRight.y);
 
-            // Keep the iframe at an internal resolution of 1280x695, but scale it to fit the monitor rectangle.
+            // Keep the iframe at an internal resolution of 1280x695 (match CSS)
             const internalWidth = 1280;
-            const internalHeight = 795;
+            const internalHeight = 695; // <-- fix: was 795
 
-            // Compute scale to fit the monitor area without overflowing.
-            // We cap scale at 1 to avoid upscaling the internal resolution (preserves crispness).
-            const scale = Math.min(1, screenPixelWidth / internalWidth, screenPixelHeight / internalHeight);
+            // Compute scale to fit the monitor rectangle (allow upscaling)
+            const scale = Math.min(screenPixelWidth / internalWidth, screenPixelHeight / internalHeight);
 
-            // Place iframe centered on the monitor (use center + translate(-50%,-50%) via transform)
             const centerX = (bottomLeft.x + topRight.x) / 2;
             const centerY = (bottomLeft.y + topRight.y) / 2;
 
-            // Set the logical size (internal resolution) and center coordinates
             websiteFrame.style.width = `${internalWidth}px`;
             websiteFrame.style.height = `${internalHeight}px`;
             websiteFrame.style.left = `${Math.round(centerX)}px`;
             websiteFrame.style.top = `${Math.round(centerY)}px`;
-
-            // Use transform to translate the element by -50% in both axes (centering),
-            // and then scale it to fit the monitor area.
             websiteFrame.style.transform = `translate(-50%, -50%) scale(${scale})`;
             websiteFrame.style.maxWidth = '';
             websiteFrame.style.maxHeight = '';
