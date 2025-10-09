@@ -5,9 +5,8 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>3D Programmer's Apartment</title>
     <style>
-        body { margin: 0; background-color: #0a0a1a; overflow: hidden; }
+        body { margin: 0; background-color: #0a0a1a; color: white; font-family: 'Courier New', Courier, monospace; overflow: hidden; }
         canvas { display: block; }
-        /* Hide the video element, it's only used as a source for the texture */
         #tvVideo {
             position: absolute;
             width: 2px;
@@ -16,44 +15,251 @@
             pointer-events: none;
             left: -9999px;
         }
+        #info, #exitTooltip {
+            position: absolute;
+            top: 10px;
+            width: 100%;
+            text-align: center;
+            z-index: 100;
+            color: rgba(255, 255, 255, 0.7);
+        }
+        #interactionTooltip {
+            position: absolute;
+            bottom: 30px;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(10, 10, 26, 0.85);
+            border: 1px solid #00bfff;
+            padding: 15px 25px;
+            border-radius: 5px;
+            font-size: 18px;
+            color: #00bfff;
+            text-shadow: 0 0 5px #00bfff;
+            z-index: 100;
+            opacity: 0;
+            pointer-events: none;
+            transition: opacity 0.3s ease-in-out;
+            box-shadow: 0 0 10px rgba(0, 191, 255, 0.2);
+        }
+        #tvControls {
+            position: absolute;
+            bottom: 5%;
+            left: 50%;
+            transform: translateX(-50%);
+            background-color: rgba(10, 10, 26, 0.85);
+            border: 1px solid #00bfff;
+            padding: 10px 15px;
+            border-radius: 8px;
+            z-index: 101;
+            box-shadow: 0 0 10px rgba(0, 191, 255, 0.2);
+            backdrop-filter: blur(5px);
+            display: none;
+            align-items: center;
+            gap: 15px;
+        }
+        #tvControls button {
+            background-color: transparent;
+            border: 1px solid #00bfff;
+            color: #00bfff;
+            cursor: pointer;
+            border-radius: 50%;
+            width: 48px;
+            height: 48px;
+            padding: 0;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            transition: background-color 0.3s, color 0.3s, box-shadow 0.3s;
+        }
+        #tvControls button:hover {
+            background-color: #00bfff;
+            color: #101018;
+            box-shadow: 0 0 10px #00bfff;
+        }
+        #tvControls button svg {
+            width: 24px;
+            height: 24px;
+        }
+        #fadeOverlay {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0a0a1a;
+            opacity: 0;
+            pointer-events: none;
+            z-index: 999;
+            transition: opacity 0.5s ease-in-out;
+        }
+        #websiteContainer {
+            position: absolute;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            display: none;
+            z-index: 102;
+        }
+        #websiteFrame {
+            position: absolute;
+            border: 2px solid #00bfff;
+            box-shadow: 0 0 20px #00bfff;
+            background-color: #000;
+            /* keep the iframe's logical size at 1280x695 and scale via transform to fit the monitor */
+            width: 1280px;
+            height: 695px;
+            transform-origin: center center;
+            will-change: transform, left, top;
+        }
+        #exitTooltip {
+            top: auto;
+            bottom: 20px;
+            color: #fff;
+            background-color: rgba(0,0,0,0.5);
+            padding: 10px;
+            border-radius: 5px;
+            display: none;
+        }
+        #splashScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0a0a1a;
+            z-index: 1000;
+            display: flex;
+            justify-content: center;
+            align-items: center;
+            flex-direction: column;
+            transition: opacity 0.8s ease-out;
+        }
+        #splashScreen h1 {
+            color: #00bfff;
+            font-size: 2.5em;
+            text-shadow: 0 0 10px #00bfff;
+            letter-spacing: 2px;
+            margin-bottom: 20px;
+        }
+        #loadingBarContainer {
+            width: 300px;
+            height: 10px;
+            border: 1px solid #00bfff;
+            border-radius: 5px;
+            overflow: hidden;
+        }
+        #loadingBar {
+            width: 0%;
+            height: 100%;
+            background-color: #00bfff;
+            transition: width 0.3s ease-out;
+        }
     </style>
 </head>
 <body>
+    <!-- Splash Screen -->
+    <div id="splashScreen">
+        <h1>Welcome to My Virtual Space</h1>
+        <div id="loadingBarContainer">
+            <div id="loadingBar"></div>
+        </div>
+    </div>
+    
     <!-- Hidden video element for the TV texture -->
     <video id="tvVideo" autoplay loop muted playsinline crossorigin="anonymous">
-        <!-- Replace this with a direct link to a public domain Tom & Jerry MP4 video -->
-        <!-- <source src="https://www.learningcontainer.com/wp-content/uploads/2020/05/sample-mp4-file.mp4" type="video/mp4"> -->
-        <source src="./Brementown Musicians UB Iwerks ComiColor.mp4" type="video/mp4">
+        <source src="https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4" type="video/mp4">
         Your browser does not support the video tag.
     </video>
+
+    <!-- UI Elements -->
+    <div id="info" style="display: none;">Click to Start, then W, A, S, D to Move & Mouse to Look  (refresh if page is blank)</div>
+    <div id="interactionTooltip">Press [Enter] to Interact</div>
+    <div id="fadeOverlay"></div>
+    <div id="tvControls">
+        <button id="tvPrev" title="Previous Video">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 6h2v12H6zm3.5 6 8.5 6V6z"></path></svg>
+        </button>
+        <button id="tvPlayPause" title="Play/Pause">
+            <svg id="tvIconPlay" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="display: none;"><path d="M8 5v14l11-7z"></path></svg>
+            <svg id="tvIconPause" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M6 19h4V5H6v14zm8-14v14h4V5h-4z"></path></svg>
+        </button>
+        <button id="tvMute" title="Mute/Unmute">
+            <svg id="tvIconUnmute" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02zM14 3.23v2.06c2.89.86 5 3.54 5 6.71s-2.11 5.85-5 6.71v2.06c4.01-.91 7-4.49 7-8.77s-2.99-7.86-7-8.77z"></path></svg>
+            <svg id="tvIconMute" xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor" style="display: none;"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3 3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4 9.91 6.09 12 8.18V4z"></path></svg>
+        </button>
+        <button id="tvNext" title="Next Video">
+            <svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 24 24" fill="currentColor"><path d="M16 6h2v12h-2zm-4.5 6-8.5 6V6z"></path></svg>
+        </button>
+    </div>
+    <div id="websiteContainer">
+        <iframe id="websiteFrame" src="about:blank"></iframe>
+        <div id="exitTooltip">Click outside the screen and Press [Esc] to Exit</div>
+    </div>
+
 
     <script type="importmap">
         {
             "imports": {
                 "three": "https://cdn.jsdelivr.net/npm/three@0.164.1/build/three.module.js",
-                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/"
+                "three/addons/": "https://cdn.jsdelivr.net/npm/three@0.164.1/examples/jsm/",
+                 "gsap": "https://cdn.jsdelivr.net/npm/gsap@3.12.5/index.js"
             }
         }
     </script>
     <script type="module">
         import * as THREE from 'three';
-        import { OrbitControls } from 'three/addons/controls/OrbitControls.js';
         import { EffectComposer } from 'three/addons/postprocessing/EffectComposer.js';
         import { RenderPass } from 'three/addons/postprocessing/RenderPass.js';
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
         import { FontLoader } from 'three/addons/loaders/FontLoader.js';
         import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+        import { gsap } from 'gsap';
 
-        let scene, camera, renderer, composer, controls;
-        let cityCanvas, cityCtx, cityTexture;
-        let bgCanvas, bgCtx;
-        let snowflakes = [];
+        // --- SCENE GLOBALS ---
+        let scene, camera, renderer, composer, clock;
+        let cityCanvas, cityCtx, cityTexture, bgCanvas, bgCtx, snowflakes = [];
         let tvVideoElement, tvVideoTexture;
-
-        // added TV loading animation resources
         let tvLoadingCanvas, tvLoadingCtx, tvLoadingTexture, tvLoadingMesh;
         let tvLoadingActive = true;
         const TV_LOADING_FADE_SPEED = 0.03;
+
+        // --- STATE MANAGEMENT ---
+        let isTeleporting = false;
+        let isNearTV = false;
+        let isNearPC = false;
+        let isUsingPC = false;
+        let isCameraAnimating = false;
+
+        // --- THIRD-PERSON CONTROLS AND PHYSICS VARS ---
+        let robot;
+        let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
+        let playerVelocity = new THREE.Vector3();
+        const playerSpeed = 8.0;
+        const robotHeight = 2.0;
+        const gravity = 30.0;
+        let playerOnFloor = false;
+        let colliders = [];
+        let interactionTooltipElement, fadeOverlayElement, tvControlsElement, websiteContainer, exitTooltip, websiteFrame, infoElement;
+        let floor, centerMonitor;
+
+        // --- TV STATE ---
+        const tvPlaylist = [
+            'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4', 
+            'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/ElephantsDream.mp4', 
+            'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
+            './videos/BrementownMusiciansUBIwerksComiColor.mp4',
+            './videos/PopeyeAliBaba_512kb.mp4',
+            './videos/TheCrystalBrawl_512kb.mp4'
+        ];
+        
+        let tvPlaylistIndex = 0;
+
+        // --- ORBITAL CAMERA VARS ---
+        let cameraTarget = new THREE.Object3D();
+        let cameraDistance = 8.0;
+        let cameraTheta = Math.PI; // Horizontal angle
+        let cameraPhi = Math.PI / 4; // Vertical angle
 
         // --- CONSTANTS ---
         const DESK_SURFACE_Y = 3.25;
@@ -63,14 +269,114 @@
         const WARM_WHITE = 0xfff5e1;
         const WALL_HEIGHT = 10;
         const ROOM_WIDTH = 15;
-        const ROOM_DEPTH = 30; // Increased depth for living room
+        const ROOM_DEPTH = 30;
 
+        // PC view (zoom) configuration - adjust these:
+        const PC_VIEW_DISTANCE = 2.7;   // meters in front of the monitor; lower -> closer zoom
+        const PC_VIEW_DURATION = 1.5;   // seconds for the zoom animation
+        const PC_VIEW_EASE = "power2.inOut";
+        
         // --- MATERIALS ---
         const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x2e2e48, roughness: 0.9 });
         const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.4 });
         const deskMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.8 });
+        
+        const darkPartMaterial = new THREE.MeshStandardMaterial({ color: 0x111111, roughness: 0.3 });
+        const accentGlowMaterial = new THREE.MeshStandardMaterial({ color: NEON_CYAN, emissive: NEON_CYAN, emissiveIntensity: 10 });
+        // --- HELPER FUNCTIONS ---
 
-        // --- OFFICE HELPER FUNCTIONS ---
+        function createArm() {
+            const armGroup = new THREE.Group();
+            
+            const upperArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.1, 0.1, 4, 8), darkPartMaterial);
+            upperArm.position.y = -0.35;
+
+            const glowDetail1 = new THREE.Mesh(new THREE.BoxGeometry(0.08, 0.2, 0.08), accentGlowMaterial);
+            glowDetail1.position.y = -0.25;
+            glowDetail1.position.z = 0.01;
+            upperArm.add(glowDetail1);
+
+            const lowerArm = new THREE.Mesh(new THREE.CapsuleGeometry(0.08, 0.2, 4, 8), darkPartMaterial);
+            lowerArm.position.y = -0.9;
+
+            const glowDetail2 = new THREE.Mesh(new THREE.BoxGeometry(0.06, 0.2, 0.06), accentGlowMaterial);
+            glowDetail2.position.y = -0.25;
+            glowDetail2.position.z = 0.01;
+            lowerArm.add(glowDetail2);
+    
+            // Hand
+            const hand = new THREE.Group();
+            const palm = new THREE.Mesh(new THREE.BoxGeometry(0.1, 0.1, 0.1), darkPartMaterial);
+            const finger1 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.04), darkPartMaterial);
+            finger1.position.set(0.06, -0.05, 0);
+            finger1.rotation.z = 0.3;
+            const finger2 = new THREE.Mesh(new THREE.BoxGeometry(0.04, 0.15, 0.04), darkPartMaterial);
+            finger2.position.set(-0.06, -0.05, 0);
+            finger2.rotation.z = -0.3;
+            hand.add(palm, finger1, finger2);
+            hand.position.y = -1.4;
+    
+            armGroup.add(upperArm, lowerArm, hand);
+            return armGroup;
+        }
+
+        function createRobot() {
+            const robotGroup = new THREE.Group();
+            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.3 });
+            const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5 });
+            const eyeMaterial = new THREE.MeshStandardMaterial({ color: NEON_CYAN, emissive: NEON_CYAN, emissiveIntensity: 10 });
+            const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.6, 0.8, 4, 16), bodyMaterial);
+            body.position.y = 1.1;
+            robotGroup.add(body);
+            const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 32, 16), bodyMaterial);
+            head.position.y = 2.2;
+            robotGroup.add(head);
+            const eye = new THREE.Mesh(new THREE.SphereGeometry(0.15, 16, 8), eyeMaterial);
+            eye.position.set(0, 2.3, 0.3);
+            robotGroup.add(eye);
+            const antennaStem = new THREE.Mesh(new THREE.CylinderGeometry(0.02, 0.02, 0.5, 8), accentMaterial);
+            antennaStem.position.y = 2.6;
+            robotGroup.add(antennaStem);
+            const antennaBall = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeMaterial);
+            antennaBall.position.y = 2.85;
+            robotGroup.add(antennaBall);
+            const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+            const wheelL = new THREE.Mesh(wheelGeometry, accentMaterial);
+            wheelL.rotation.z = Math.PI / 2;
+            wheelL.position.set(0.65, 0.5, 0);
+            robotGroup.add(wheelL);
+            const wheelR = new THREE.Mesh(wheelGeometry, accentMaterial);
+            wheelR.rotation.z = Math.PI / 2;
+            wheelR.position.set(-0.65, 0.5, 0);
+            robotGroup.add(wheelR);
+            // const handGeometry = new THREE.CapsuleGeometry(0.1, 0.7, 4, 8);
+            // const handL = new THREE.Mesh(handGeometry, accentMaterial);
+            // handL.position.set(0.7, 1.4, 0);
+            // robotGroup.add(handL);
+            // const handR = new THREE.Mesh(handGeometry, accentMaterial);
+            // handR.position.set(-0.7, 1.4, 0);
+            // robotGroup.add(handR);
+
+            const armL = createArm();
+            armL.position.set(0.6, 2.1, 0);
+            armL.rotation.z = 0.2;
+            robotGroup.add(armL);
+        
+            const armR = createArm();
+            armR.position.set(-0.6, 2.1, 0);
+            armR.rotation.z = -0.2;
+            robotGroup.add(armR);
+
+            const collisionBox = new THREE.Mesh(
+                new THREE.BoxGeometry(1.2, robotHeight, 1.2),
+                new THREE.MeshBasicMaterial({ visible: false, wireframe: true })
+            );
+            collisionBox.position.y = robotHeight / 2;
+            robotGroup.add(collisionBox);
+            robotGroup.userData.collisionBox = collisionBox;
+            return robotGroup;
+        }
+
         function createDrawerUnit(position) {
             const group = new THREE.Group();
             const casingMaterial = new THREE.MeshStandardMaterial({ color: 0xe0e0e0, roughness: 0.8 });
@@ -186,7 +492,6 @@
             return octopusGroup;
         }
 
-        // --- ** LIVING ROOM HELPER FUNCTIONS ** ---
         function createSofa() {
             const sofaGroup = new THREE.Group();
             const sofaMaterial = new THREE.MeshStandardMaterial({ color: 0x3a3a4a, roughness: 0.8 });
@@ -216,7 +521,6 @@
             const topFrame = new THREE.Mesh(new THREE.BoxGeometry(4.5, 0.2, 2.5), frameMaterial);
             topFrame.position.y = 1;
             tableGroup.add(topFrame);
-
             for (let x = -1; x <= 1; x += 2) {
                 for (let z = -1; z <= 1; z += 2) {
                     const leg = new THREE.Mesh(new THREE.BoxGeometry(0.2, 1, 0.2), frameMaterial);
@@ -239,10 +543,6 @@
             const consoleMaterial = new THREE.MeshStandardMaterial({ color: 0x1c1c1c, roughness: 0.8 });
             const body = new THREE.Mesh(new THREE.BoxGeometry(8, 1.2, 2), consoleMaterial);
             consoleGroup.add(body);
-
-            // TV Screen
-            // Use the video texture for the TV screen
-            // mark the TV material as not toneMapped so renderer toneMapping / exposure / bloom don't push it too bright
             const tvScreenMaterial = new THREE.MeshBasicMaterial({ map: tvVideoTexture, toneMapped: false });
             const tvFrame = new THREE.Mesh(new THREE.BoxGeometry(6.5, 3.7, 0.2), darkMaterial);
             const tvScreen = new THREE.Mesh(new THREE.BoxGeometry(6.3, 3.5, 0.1), tvScreenMaterial);
@@ -250,38 +550,30 @@
             tvFrame.add(tvScreen);
             tvFrame.position.y = 0.6 + (3.7 / 2);
             consoleGroup.add(tvFrame);
-
-            // Create an animated loading overlay plane that sits slightly in front of the screen.
-            // It uses a 2D canvas texture that we update each frame until the video is playing.
             function createTvLoadingOverlay(widthMeters = 6.3, heightMeters = 3.5) {
                 const aspect = widthMeters / heightMeters;
                 const canvasW = 640;
                 const canvasH = Math.round(canvasW / aspect);
-
                 tvLoadingCanvas = document.createElement('canvas');
                 tvLoadingCanvas.width = canvasW;
                 tvLoadingCanvas.height = canvasH;
                 tvLoadingCtx = tvLoadingCanvas.getContext('2d');
-
                 tvLoadingTexture = new THREE.CanvasTexture(tvLoadingCanvas);
                 tvLoadingTexture.minFilter = THREE.LinearFilter;
                 tvLoadingTexture.magFilter = THREE.LinearFilter;
-
                 const mat = new THREE.MeshBasicMaterial({
                     map: tvLoadingTexture,
                     transparent: true,
                     opacity: 1.0,
-                    depthWrite: false // keep overlay visible on top
+                    depthWrite: false
                 });
                 const plane = new THREE.Mesh(new THREE.PlaneGeometry(widthMeters, heightMeters), mat);
-                plane.position.z = 0.12; // slightly in front of the tvScreen
+                plane.position.z = 0.12;
                 plane.renderOrder = 999;
                 return plane;
             }
-
             tvLoadingMesh = createTvLoadingOverlay();
             tvFrame.add(tvLoadingMesh);
-
             return consoleGroup;
         }
 
@@ -303,7 +595,45 @@
             return lampGroup;
         }
 
-        // --- CANVAS TEXTURE FUNCTIONS ---
+        function createMonitor(x, z, rotationY, textureLoader, isCenter = false) {
+            const monitorGroup = new THREE.Group();
+            const monitorFrame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.1, 0.15), darkMaterial);
+            monitorGroup.add(monitorFrame);
+            
+            const monitorScreen = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2, 0.1), createCodeScreenMaterial());
+            monitorScreen.position.z = 0.03;
+            monitorGroup.add(monitorScreen);
+            
+            const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 16), new THREE.MeshStandardMaterial({ color: 0x333333 }));
+            stand.position.y = -1.3;
+            monitorGroup.add(stand);
+            monitorGroup.position.set(x, DESK_SURFACE_Y + 1.05, z);
+            monitorGroup.rotation.y = rotationY;
+            scene.add(monitorGroup);
+            colliders.push(monitorGroup);
+            if (isCenter) {
+                centerMonitor = monitorScreen;
+            }
+        }
+
+        function createPoster(imageUrl, position, size, textureLoader, rotationY = 0) {
+            const posterMaterial = new THREE.MeshStandardMaterial({
+                map: textureLoader.load(imageUrl),
+                color: 0xcccccc
+            });
+            const poster = new THREE.Mesh(new THREE.PlaneGeometry(size.w, size.h), posterMaterial);
+            poster.position.set(position.x, position.y, position.z);
+            poster.rotation.y = rotationY;
+            scene.add(poster);
+        }
+
+        function createEmissiveBox(color, intensity, position, size) {
+            const material = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: intensity });
+            const box = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), material);
+            box.position.copy(position);
+            scene.add(box);
+        }
+
         function setupCitySceneAndTexture() {
             cityCanvas = document.createElement('canvas'); cityCtx = cityCanvas.getContext('2d');
             cityCanvas.width = 256; cityCanvas.height = 512;
@@ -349,23 +679,71 @@
         }
 
         function createCodeScreenMaterial() {
-            const canvas = document.createElement('canvas'); canvas.width = 512; canvas.height = 256;
-            const ctx = canvas.getContext('2d'); ctx.fillStyle = '#1e1e1e'; ctx.fillRect(0, 0, canvas.width, canvas.height);
-            ctx.fillStyle = '#252526'; ctx.fillRect(0, 0, 80, canvas.height); ctx.fillStyle = '#2d2d2d'; ctx.fillRect(80, 0, canvas.width - 80, 30);
-            ctx.fillStyle = '#cccccc'; ctx.font = '14px sans-serif'; ctx.fillText('scene.js', 95, 20);
-            const code = ["// ... existing code ...","function animate() {","  requestAnimationFrame(animate);","  controls.update();","  composer.render();","}","","init();","animate();"];
-            ctx.font = '16px monospace';
+            // Use a higher-resolution canvas that matches 1280x695
+            const canvas = document.createElement('canvas');
+            canvas.width = 1280;
+            canvas.height = 800;
+            const ctx = canvas.getContext('2d');
+
+            // Scale helper (original code used 512x256 base)
+            const scale = canvas.width / 512;
+
+            // Background / UI blocks
+            ctx.fillStyle = '#1e1e1e';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+            ctx.fillStyle = '#252526';
+            ctx.fillRect(0, 0, Math.round(80 * scale), canvas.height);
+            ctx.fillStyle = '#2d2d2d';
+            ctx.fillRect(Math.round(80 * scale), 0, canvas.width - Math.round(80 * scale), Math.round(30 * scale));
+
+            // Header text
+            ctx.fillStyle = '#cccccc';
+            ctx.font = `${Math.max(12, Math.round(14 * scale))}px sans-serif`;
+            ctx.fillText('scene.js', Math.round(95 * scale), Math.round(20 * scale));
+
+            // Example code block (scaled)
+            const code = [
+                "// ... existing code ...",
+                "function animate() {",
+                "  requestAnimationFrame(animate);",
+                "  updatePlayer(delta);",
+                "  composer.render();",
+                "}",
+                "",
+                "init();",
+                "animate();"
+            ];
+
+            ctx.font = `${Math.max(12, Math.round(16 * scale))}px monospace`;
             for (let i = 0; i < code.length; i++) {
-                const y = 55 + i * 20; ctx.fillStyle = '#858585'; ctx.fillText((i + 1).toString().padStart(2, ' '), 90, y);
-                if (code[i].includes('function') || code[i].includes('const')) { ctx.fillStyle = '#569cd6'; }
-                else if (code[i].startsWith('//')) { ctx.fillStyle = '#6a9955'; }
-                else { ctx.fillStyle = '#d4d4d4'; }
-                ctx.fillText(code[i], 130, y);
+                const y = Math.round((55 + i * 20) * scale);
+                ctx.fillStyle = '#858585';
+                ctx.fillText((i + 1).toString().padStart(2, ' '), Math.round(90 * scale), y);
+                if (code[i].includes('function') || code[i].includes('const')) {
+                    ctx.fillStyle = '#569cd6';
+                } else if (code[i].startsWith('//')) {
+                    ctx.fillStyle = '#6a9955';
+                } else {
+                    ctx.fillStyle = '#d4d4d4';
+                }
+                ctx.fillText(code[i], Math.round(130 * scale), y);
             }
-            return new THREE.MeshStandardMaterial({ map: new THREE.CanvasTexture(canvas), emissive: 0xffffff, emissiveMap: new THREE.CanvasTexture(canvas), emissiveIntensity: 0.8, toneMapped: false });
+
+            const tex = new THREE.CanvasTexture(canvas);
+            tex.minFilter = THREE.LinearFilter;
+            tex.magFilter = THREE.LinearFilter;
+
+            // Use the same canvas as emissive map for glow
+            return new THREE.MeshStandardMaterial({
+                map: tex,
+                emissive: 0xffffff,
+                emissiveMap: tex,
+                emissiveIntensity: 0.8,
+                toneMapped: false
+            });
         }
 
-        function createRugTexture(color1, color2, text) {
+        function createRugTexture(color1, color2, text, textureLoader) {
             const canvas = document.createElement('canvas'); canvas.width = 256; canvas.height = 256;
             const ctx = canvas.getContext('2d'); ctx.fillStyle = color1; ctx.fillRect(0, 0, 256, 256);
             ctx.font = '8px monospace'; ctx.fillStyle = color2;
@@ -377,15 +755,47 @@
             return new THREE.CanvasTexture(canvas);
         }
 
+        function playTvIndex(i) {
+            tvPlaylistIndex = ((i % tvPlaylist.length) + tvPlaylist.length) % tvPlaylist.length;
+            tvVideoElement.src = tvPlaylist[tvPlaylistIndex];
+            tvVideoElement.load();
+            const p = tvVideoElement.play();
+            if (p !== undefined) {
+                p.catch(() => {
+                    const resume = () => { tvVideoElement.play().catch(()=>{}); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
+                    window.addEventListener('pointerdown', resume);
+                    window.addEventListener('keydown', resume);
+                });
+            }
+        }
+
         function init() {
-            // --- 1. SCENE FOUNDATION & CAMERA ---
+            // --- UI & LOADING ---
+            const splashScreen = document.getElementById('splashScreen');
+            const loadingBar = document.getElementById('loadingBar');
+            infoElement = document.getElementById('info');
+            
+            const loadingManager = new THREE.LoadingManager();
+            loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
+                loadingBar.style.width = (itemsLoaded / itemsTotal) * 100 + '%';
+            };
+            loadingManager.onLoad = () => {
+                splashScreen.style.opacity = '0';
+                setTimeout(() => {
+                    splashScreen.style.display = 'none';
+                    infoElement.style.display = 'block';
+                    animate(); // Start the main loop only after everything is loaded
+                }, 800);
+            };
+
+            const textureLoader = new THREE.TextureLoader(loadingManager);
+            const fontLoader = new FontLoader(loadingManager);
+
+            // --- SCENE SETUP ---
             scene = new THREE.Scene();
             scene.background = new THREE.Color(0x101018);
-            const aspect = window.innerWidth / window.innerHeight;
-            const d = 15;
-            camera = new THREE.OrthographicCamera(-d * aspect, d * aspect, d, -d, 1, 1000);
-            camera.position.set(20, 20, 20);
-            camera.lookAt(scene.position);
+            clock = new THREE.Clock();
+            camera = new THREE.PerspectiveCamera(60, window.innerWidth / window.innerHeight, 0.1, 1000);
             renderer = new THREE.WebGLRenderer({ antialias: true });
             renderer.setSize(window.innerWidth, window.innerHeight);
             renderer.setPixelRatio(window.devicePixelRatio);
@@ -393,114 +803,58 @@
             renderer.toneMappingExposure = 1.1;
             renderer.outputColorSpace = THREE.SRGBColorSpace;
             document.body.appendChild(renderer.domElement);
-            controls = new OrbitControls(camera, renderer.domElement);
-            controls.enableDamping = true;
-            controls.dampingFactor = 0.05;
-            controls.target.set(0, 2.5, 0);
-
-            // Get the video element and create a VideoTexture
+            robot = createRobot();
+            robot.position.set(0, 0, 11);
+            scene.add(robot);
+            scene.add(cameraTarget);
             tvVideoElement = document.getElementById('tvVideo');
-
-            // Playlist for the TV: replace these paths / URLs with your videos
-            const tvPlaylist = [
-                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/BigBuckBunny.mp4',
-                'https://commondatastorage.googleapis.com/gtv-videos-bucket/sample/TearsOfSteel.mp4',
-                './videos/BrementownMusiciansUBIwerksComiColor.mp4',
-                './videos/PopeyeAliBaba_512kb.mp4',
-                './videos/TheCrystalBrawl_512kb.mp4'
-            ];
-            let tvPlaylistIndex = 0;
-
-            function playTvIndex(i) {
-                tvPlaylistIndex = ((i % tvPlaylist.length) + tvPlaylist.length) % tvPlaylist.length;
-                tvVideoElement.src = tvPlaylist[tvPlaylistIndex];
-                tvVideoElement.load();
-                tvVideoElement.muted = true;
-                const p = tvVideoElement.play();
-                if (p !== undefined) {
-                    p.catch(() => {
-                        // Autoplay blocked: resume on first user interaction
-                        const resume = () => { tvVideoElement.play().catch(()=>{}); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
-                        window.addEventListener('pointerdown', resume);
-                        window.addEventListener('keydown', resume);
-                    });
-                }
-            }
-
-            // Advance to next video when one ends or errors, loop back automatically
+            
             tvVideoElement.addEventListener('ended', () => playTvIndex(tvPlaylistIndex + 1));
             tvVideoElement.addEventListener('error', () => playTvIndex(tvPlaylistIndex + 1));
-
-            // create the three.js VideoTexture that will follow the <video> element
             tvVideoTexture = new THREE.VideoTexture(tvVideoElement);
-            // safer defaults for filtering/format/encoding
             tvVideoTexture.minFilter = THREE.LinearFilter;
             tvVideoTexture.magFilter = THREE.LinearFilter;
             tvVideoTexture.format = THREE.RGBAFormat;
-            // ensure correct color space for video (prevents over-brightening)
-            if (THREE.sRGBEncoding) tvVideoTexture.encoding = THREE.sRGBEncoding;
+            if (renderer.capabilities.isWebGL2) { tvVideoTexture.colorSpace = THREE.SRGBColorSpace; } else { tvVideoTexture.encoding = THREE.sRGBEncoding; }
             tvVideoTexture.needsUpdate = true;
-
-            // start the playlist
             playTvIndex(0);
-
-            // lower exposure slightly to reduce extra brightness from bloom/toneMapping
             renderer.toneMappingExposure = 1.0;
-
-            // Try to play the video (autoplay may be blocked — handle promise)
-            tvVideoElement.muted = true; // ensure autoplay allowed on most browsers
             const playPromise = tvVideoElement.play();
             if (playPromise !== undefined) {
                 playPromise.catch((err) => {
-                    console.warn('Video autoplay blocked, will try after user interaction:', err);
                     const resume = () => { tvVideoElement.play().catch(()=>{}); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
                     window.addEventListener('pointerdown', resume);
                     window.addEventListener('keydown', resume);
                 });
             }
-
-            // Show/hide loading overlay based on video playback state.
-            // When the video reaches 'playing' state we fade out the loading overlay.
-            tvVideoElement.addEventListener('playing', () => {
-                tvLoadingActive = false; // start fade out in animate loop
-            });
-            // If video stalls or is waiting, bring the overlay back
-            tvVideoElement.addEventListener('waiting', () => {
-                if (tvLoadingMesh) {
-                    tvLoadingMesh.material.opacity = 1.0;
-                    tvLoadingMesh.visible = true;
-                    tvLoadingActive = true;
-                }
-            });
-            // If the playlist advances, reset overlay until next 'playing'
-            tvVideoElement.addEventListener('ended', () => {
-                tvLoadingActive = true;
-                if (tvLoadingMesh) { tvLoadingMesh.material.opacity = 1.0; tvLoadingMesh.visible = true; }
-            });
-
-            // --- POST-PROCESSING (BLOOM) --- // modify bloomPass.strength for changes to brightness in video
+            tvVideoElement.addEventListener('playing', () => { tvLoadingActive = false; });
+            tvVideoElement.addEventListener('waiting', () => { if (tvLoadingMesh) { tvLoadingMesh.material.opacity = 1.0; tvLoadingMesh.visible = true; tvLoadingActive = true; }});
+            tvVideoElement.addEventListener('ended', () => { tvLoadingActive = true; if (tvLoadingMesh) { tvLoadingMesh.material.opacity = 1.0; tvLoadingMesh.visible = true; }});
             const renderScene = new RenderPass(scene, camera);
             const bloomPass = new UnrealBloomPass(new THREE.Vector2(window.innerWidth, window.innerHeight), 1.5, 0.4, 0.85);
             bloomPass.threshold = 0.1; bloomPass.strength = 0.2; bloomPass.radius = 0.5;
             composer = new EffectComposer(renderer);
             composer.addPass(renderScene);
             composer.addPass(bloomPass);
-
-            // --- 2. ROOM GEOMETRY ---
             setupCitySceneAndTexture();
-
-            const floor = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, 0.2, ROOM_DEPTH), new THREE.MeshStandardMaterial({ color: 0x3a3a5a }));
+            floor = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, 0.2, ROOM_DEPTH), new THREE.MeshStandardMaterial({ color: 0x3a3a5a }));
             scene.add(floor);
-
             const backWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, WALL_HEIGHT, 0.2), wallMaterial);
             backWall.position.set(0, WALL_HEIGHT / 2, -ROOM_DEPTH / 2);
             scene.add(backWall);
-
+            colliders.push(backWall);
             const leftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, ROOM_DEPTH), wallMaterial);
             leftWall.position.set(-ROOM_WIDTH / 2, WALL_HEIGHT / 2, 0);
             scene.add(leftWall);
-
-            // Partition wall with a doorway
+            colliders.push(leftWall);
+            const rightWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, ROOM_DEPTH), wallMaterial);
+            rightWall.position.set(ROOM_WIDTH / 2, WALL_HEIGHT / 2, 0);
+            scene.add(rightWall);
+            colliders.push(rightWall);
+            const frontWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, WALL_HEIGHT, 0.2), wallMaterial);
+            frontWall.position.set(0, WALL_HEIGHT / 2, ROOM_DEPTH / 2);
+            scene.add(frontWall);
+            colliders.push(frontWall);
             const partitionZ = 0;
             const doorWidth = 3.5;
             const doorHeight = 7;
@@ -508,32 +862,32 @@
             const wallSection1 = new THREE.Mesh(new THREE.BoxGeometry(wallSectionWidth1, WALL_HEIGHT, 0.2), wallMaterial);
             wallSection1.position.set(-ROOM_WIDTH / 2 + wallSectionWidth1 / 2, WALL_HEIGHT / 2, partitionZ);
             scene.add(wallSection1);
+            colliders.push(wallSection1);
             const wallSection2 = new THREE.Mesh(new THREE.BoxGeometry(wallSectionWidth1, WALL_HEIGHT, 0.2), wallMaterial);
             wallSection2.position.set(ROOM_WIDTH / 2 - wallSectionWidth1 / 2, WALL_HEIGHT / 2, partitionZ);
             scene.add(wallSection2);
+            colliders.push(wallSection2);
             const wallHeader = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, WALL_HEIGHT - doorHeight, 0.2), wallMaterial);
             wallHeader.position.set(0, doorHeight + (WALL_HEIGHT - doorHeight) / 2, partitionZ);
             scene.add(wallHeader);
-
-            // Door with handles
+            colliders.push(wallHeader);
             const door = new THREE.Mesh(new THREE.BoxGeometry(doorWidth - 0.2, doorHeight - 0.1, 0.1), darkMaterial);
             const handleMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.3 });
             const handleGeometry = new THREE.BoxGeometry(0.1, 0.4, 0.15);
             const handle1 = new THREE.Mesh(handleGeometry, handleMaterial);
-            const handleX = (doorWidth - 0.2) / 2 - 0.4; // Position from door's center
-            handle1.position.set(handleX, 0, 0.1); // Front side
+            const handleX = (doorWidth - 0.2) / 2 - 0.4;
+            handle1.position.set(handleX, 0, 0.1);
             door.add(handle1);
             const handle2 = new THREE.Mesh(handleGeometry, handleMaterial);
-            handle2.position.set(handleX, 0, -0.1); // Back side
+            handle2.position.set(handleX, 0, -0.1);
             door.add(handle2);
-
             door.position.set(doorWidth / 2 - 0.1, doorHeight / 2, 0);
             const doorGroup = new THREE.Group();
             doorGroup.add(door);
             doorGroup.position.set(-doorWidth / 2, 0, partitionZ);
             doorGroup.rotation.y = Math.PI / 8;
             scene.add(doorGroup);
-
+            colliders.push(door);
             const windowFrame = new THREE.Group();
             windowFrame.add(new THREE.Mesh(new THREE.BoxGeometry(5, 5.5, 0.25), new THREE.MeshStandardMaterial({color: 0x111111})));
             const cityView = new THREE.Mesh(new THREE.PlaneGeometry(4.5, 5), new THREE.MeshBasicMaterial({ map: cityTexture, side: THREE.DoubleSide }));
@@ -541,121 +895,75 @@
             windowFrame.add(cityView);
             windowFrame.position.set(4, 6, -ROOM_DEPTH/2 + 0.2);
             scene.add(windowFrame);
-
-            // --- 3. OFFICE FURNITURE & TECH ---
             const deskTop = new THREE.Mesh(new THREE.BoxGeometry(10, 0.3, 3), deskMaterial);
             deskTop.position.set(0, 3, -13.5); scene.add(deskTop);
+            colliders.push(deskTop);
             const drawerUnit1 = createDrawerUnit(new THREE.Vector3(-4.5, 1.6, -13.5)); scene.add(drawerUnit1);
+            colliders.push(drawerUnit1);
             const drawerUnit2 = createDrawerUnit(new THREE.Vector3(4.5, 1.6, -13.5)); scene.add(drawerUnit2);
+            colliders.push(drawerUnit2);
             const pcPedestal = new THREE.Mesh(new THREE.BoxGeometry(1.7, 0.2, 3.2), new THREE.MeshStandardMaterial({color: 0x111111}));
             pcPedestal.position.set(6, 0.2, -13.2); scene.add(pcPedestal);
             const pcCase = new THREE.Mesh(new THREE.BoxGeometry(1.5, 3.5, 3), new THREE.MeshStandardMaterial({ color: 0x1a1a1a }));
             pcCase.position.set(6, 2.05, -13.2); scene.add(pcCase);
-
-            function createMonitor(x, z, rotationY) {
-                const monitorGroup = new THREE.Group();
-                const monitorFrame = new THREE.Mesh(new THREE.BoxGeometry(3.6, 2.1, 0.15), darkMaterial);
-                monitorGroup.add(monitorFrame);
-                const monitorScreen = new THREE.Mesh(new THREE.BoxGeometry(3.5, 2, 0.1), createCodeScreenMaterial());
-                monitorScreen.position.z = 0.03; monitorGroup.add(monitorScreen);
-                const stand = new THREE.Mesh(new THREE.CylinderGeometry(0.2, 0.2, 1, 16), new THREE.MeshStandardMaterial({ color: 0x333333 }));
-                stand.position.y = -1.3; monitorGroup.add(stand);
-                monitorGroup.position.set(x, DESK_SURFACE_Y + 1.05, z);
-                monitorGroup.rotation.y = rotationY;
-                scene.add(monitorGroup);
-            }
-            createMonitor(-0.5, -14.2, 0);
-            createMonitor(3.3, -13.7, -Math.PI / 8);
-            createMonitor(-4.3, -13.7, Math.PI / 8);
-
+            colliders.push(pcCase);
+            createMonitor(-0.5, -14.2, 0, textureLoader, true);
+            createMonitor(3.3, -13.7, -Math.PI / 8, textureLoader);
+            createMonitor(-4.3, -13.7, Math.PI / 8, textureLoader);
             const chair = createOfficeChair(); chair.position.set(-1.5, 0.1, -10.5); chair.rotation.y = Math.PI / 1.1; scene.add(chair);
+            colliders.push(chair);
             const octopus = createCuteOctopus(); octopus.position.set(-3.5, DESK_SURFACE_Y, -12.8); octopus.rotation.y = Math.PI / 4; scene.add(octopus);
             const keyboard = createKeyboard(); keyboard.position.set(-0.5, DESK_SURFACE_Y, -12.9); keyboard.rotation.y = 0.05; scene.add(keyboard);
             const mouse = createMouse(); mouse.position.set(1.5, DESK_SURFACE_Y, -12.8); mouse.rotation.y = -Math.PI / 12; scene.add(mouse);
-
-            // Office Rug
             const officeRug = new THREE.Mesh(new THREE.PlaneGeometry(8, 6), new THREE.MeshStandardMaterial({map: createRugTexture('#2a2a3a', 'rgba(0, 191, 255, 0.4)', () => Math.random() > 0.5 ? '1' : '0')}));
             officeRug.rotation.x = -Math.PI / 2; officeRug.position.set(-1, 0.11, -10); scene.add(officeRug);
-
-            // Posters and Shelves
             const shelfMaterial = new THREE.MeshStandardMaterial({color: 0x1a1a1a});
             const shelf1 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 1.5), shelfMaterial);
             shelf1.position.set(-6.5, 8.5, -3.5); shelf1.rotation.y = Math.PI / 2; scene.add(shelf1);
+            colliders.push(shelf1);
             const shelf2 = new THREE.Mesh(new THREE.BoxGeometry(3, 0.2, 1.5), shelfMaterial);
             shelf2.position.set(-6.5, 7, -3.5); shelf2.rotation.y = Math.PI / 2; scene.add(shelf2);
-
-            const plant1 = createPlantPot();
-            plant1.position.set(-6.5, 8.6, -2.5);
-            scene.add(plant1);
-            const plant2 = createPlantPot();
-            plant2.position.set(-6.5, 8.6, -3.5);
-            scene.add(plant2);
-            const plant3 = createPlantPot();
-            plant3.position.set(-6.5, 8.6, -4.5);
-            scene.add(plant3);
-            const plant4 = createPlantPot();
-            plant4.position.set(-6.5, 7.1, -3.5);
-            scene.add(plant4);
-
-            function createPoster(imageUrl, position, size, rotationY = 0) {
-                const posterMaterial = new THREE.MeshStandardMaterial({ map: new THREE.TextureLoader().load(imageUrl), color: 0xcccccc });
-                const poster = new THREE.Mesh(new THREE.PlaneGeometry(size.w, size.h), posterMaterial);
-                poster.position.set(position.x, position.y, position.z);
-                poster.rotation.y = rotationY;
-                scene.add(poster);
-            }
-            createPoster('https://placehold.co/400x600/000000/FFFFFF?text=CODE', {x: -1, y: 7, z: -14.8}, {w: 2.5, h: 3.5});
-            createPoster('https://placehold.co/400x300/000000/FFFFFF?text=JS', {x: -7.2, y: 4.5, z: -13.5}, {w: 2.5, h: 1.8}, Math.PI/2);
-            createPoster('https://placehold.co/300x400/000000/FFFFFF?text=UI/UX', {x: -7.2, y: 4.5, z: -10.5}, {w: 1.8, h: 2.5}, Math.PI/2);
-            createPoster('https://placehold.co/300x400/000000/FFFFFF?text=SYNTH', {x: -4, y: 8, z: -14.8}, {w: 1.8, h: 2.5});
-
-            // --- 4. LIVING ROOM FURNITURE (UPDATED) ---
+            colliders.push(shelf2);
+            const plant1 = createPlantPot(); plant1.position.set(-6.5, 8.6, -2.5); scene.add(plant1);
+            const plant2 = createPlantPot(); plant2.position.set(-6.5, 8.6, -3.5); scene.add(plant2);
+            const plant3 = createPlantPot(); plant3.position.set(-6.5, 8.6, -4.5); scene.add(plant3);
+            const plant4 = createPlantPot(); plant4.position.set(-6.5, 7.1, -3.5); scene.add(plant4);
+            createPoster('https://placehold.co/400x600/000000/FFFFFF?text=CODE', {x: -1, y: 7, z: -14.8}, {w: 2.5, h: 3.5}, textureLoader);
+            createPoster('https://placehold.co/400x300/000000/FFFFFF?text=JS', {x: -7.2, y: 4.5, z: -13.5}, {w: 2.5, h: 1.8}, textureLoader, Math.PI/2);
+            createPoster('https://placehold.co/300x400/000000/FFFFFF?text=UI/UX', {x: -7.2, y: 4.5, z: -10.5}, {w: 1.8, h: 2.5}, textureLoader, Math.PI/2);
+            createPoster('https://placehold.co/300x400/000000/FFFFFF?text=SYNTH', {x: -4, y: 8, z: -14.8}, {w: 1.8, h: 2.5}, textureLoader);
             const sofa = createSofa();
-            sofa.position.set(3, 0.1, 8);
+            sofa.position.set(3.5, 0.1, 8);
             sofa.rotation.y = -Math.PI / 2;
             scene.add(sofa);
-
+            colliders.push(sofa);
             const coffeeTable = createCoffeeTable();
-            coffeeTable.position.set(-1.5, 0.1, 8);
+            coffeeTable.position.set(-2.0, 0.1, 8);
             coffeeTable.rotation.y = Math.PI / 2;
             scene.add(coffeeTable);
-
+            colliders.push(coffeeTable);
             const tvConsole = createTVConsole();
             tvConsole.position.set(-6.5, 0.6 + 0.1, 8);
             tvConsole.rotation.y = Math.PI / 2;
             scene.add(tvConsole);
-
+            colliders.push(tvConsole);
             const livingRoomLamp = createFloorLamp();
             livingRoomLamp.position.set(-6.5, 0.1, 3);
             scene.add(livingRoomLamp);
-
+            colliders.push(livingRoomLamp);
             const livingRoomRug = new THREE.Mesh(new THREE.PlaneGeometry(10, 12), new THREE.MeshStandardMaterial({ map: createRugTexture('#4a3a3a', 'rgba(255, 0, 255, 0.4)', () => ['<>', '{}', '/>', '[]'][Math.floor(Math.random()*4)])}));
             livingRoomRug.rotation.x = -Math.PI / 2; livingRoomRug.position.set(-1, 0.11, 8); scene.add(livingRoomRug);
-
-
-            // --- 5. LIGHTING & DETAILS ---
             scene.add(new THREE.AmbientLight(0xffffff, 0.5));
             scene.add(new THREE.HemisphereLight(NEON_BLUE, NEON_PINK, 1.8));
             const deskLight = new THREE.PointLight(NEON_BLUE, 3, 15, 1.0); deskLight.position.set(-1, 0.5, -12.5); scene.add(deskLight);
             const windowLight = new THREE.PointLight(NEON_PINK, 15, 20, 1); windowLight.position.set(4, 5, -13); scene.add(windowLight);
             const syntaxLight = new THREE.PointLight(NEON_CYAN, 5, 18, 1.2); syntaxLight.position.set(-7, 8, -10); scene.add(syntaxLight);
-
-            function createEmissiveBox(color, intensity, position, size) {
-                const material = new THREE.MeshStandardMaterial({ color: color, emissive: color, emissiveIntensity: intensity });
-                const box = new THREE.Mesh(new THREE.BoxGeometry(size.x, size.y, size.z), material);
-                box.position.copy(position); scene.add(box);
-            }
             createEmissiveBox(NEON_BLUE, 5, new THREE.Vector3(5, 3.1, -13.5), {x: 0.1, y: 0.1, z: 3});
             createEmissiveBox(NEON_BLUE, 3, new THREE.Vector3(-7.4, 0.2, 0), {x: 0.1, y: 0.1, z: ROOM_DEPTH});
             createEmissiveBox(NEON_BLUE, 3, new THREE.Vector3(0, 0.2, -14.9), {x: ROOM_WIDTH, y: 0.1, z: 0.1});
-
             const fanMaterial = new THREE.MeshStandardMaterial({color: NEON_PINK, emissive: NEON_PINK, emissiveIntensity: 5});
-            for(let i = 0; i < 3; i++) {
-                const fan = new THREE.Mesh(new THREE.CircleGeometry(0.3, 32), fanMaterial);
-                fan.position.set(5.25, 1.2 + i * 0.8, -13.2); fan.rotation.y = Math.PI/2; scene.add(fan);
-            }
-
-            const fontLoader = new FontLoader();
+            for(let i = 0; i < 3; i++) { const fan = new THREE.Mesh(new THREE.CircleGeometry(0.3, 32), fanMaterial); fan.position.set(5.25, 1.2 + i * 0.8, -13.2); fan.rotation.y = Math.PI/2; scene.add(fan); }
+            
             fontLoader.load('https://cdn.jsdelivr.net/npm/three@0.164.1/examples/fonts/helvetiker_bold.typeface.json', (font) => {
                 const textMaterial = new THREE.MeshStandardMaterial({color: NEON_CYAN, emissive: NEON_CYAN, emissiveIntensity: 8});
                 const textGeo1 = new TextGeometry('SYNTAX', { font, size: 0.8, height: 0.1 });
@@ -666,117 +974,421 @@
                 textMesh2.position.set(-7.4, 7.5, -10); textMesh2.rotation.y = Math.PI / 2; scene.add(textMesh2);
             });
 
+            // --- GET UI ELEMENTS ---
+            interactionTooltipElement = document.getElementById('interactionTooltip');
+            fadeOverlayElement = document.getElementById('fadeOverlay');
+            tvControlsElement = document.getElementById('tvControls');
+            websiteContainer = document.getElementById('websiteContainer');
+            websiteFrame = document.getElementById('websiteFrame');
+            exitTooltip = document.getElementById('exitTooltip');
+
+            // --- TV CONTROL EVENT LISTENERS ---
+            const tvPlayPauseBtn = document.getElementById('tvPlayPause');
+            const tvMuteBtn = document.getElementById('tvMute');
+            const tvNextBtn = document.getElementById('tvNext');
+            const tvPrevBtn = document.getElementById('tvPrev');
+            const tvIconPlay = document.getElementById('tvIconPlay');
+            const tvIconPause = document.getElementById('tvIconPause');
+            const tvIconMute = document.getElementById('tvIconMute');
+            const tvIconUnmute = document.getElementById('tvIconUnmute');
+
+            const updatePlayPauseButton = () => {
+                tvIconPlay.style.display = tvVideoElement.paused ? 'block' : 'none';
+                tvIconPause.style.display = tvVideoElement.paused ? 'none' : 'block';
+            };
+            const updateMuteButton = () => {
+                tvIconMute.style.display = tvVideoElement.muted ? 'block' : 'none';
+                tvIconUnmute.style.display = tvVideoElement.muted ? 'none' : 'block';
+            };
+            
+            const handleTVButtonClick = (event, action) => {
+                event.stopPropagation(); 
+                action();
+            };
+
+            tvPlayPauseBtn.addEventListener('click', (e) => handleTVButtonClick(e, () => {
+                if (tvVideoElement.paused) tvVideoElement.play();
+                else tvVideoElement.pause();
+            }));
+            tvMuteBtn.addEventListener('click', (e) => handleTVButtonClick(e, () => { tvVideoElement.muted = !tvVideoElement.muted; }));
+            tvNextBtn.addEventListener('click', (e) => handleTVButtonClick(e, () => playTvIndex(tvPlaylistIndex + 1)));
+            tvPrevBtn.addEventListener('click', (e) => handleTVButtonClick(e, () => playTvIndex(tvPlaylistIndex - 1)));
+            
+            tvVideoElement.addEventListener('play', updatePlayPauseButton);
+            tvVideoElement.addEventListener('pause', updatePlayPauseButton);
+            tvVideoElement.addEventListener('volumechange', updateMuteButton);
+
+            updatePlayPauseButton();
+            updateMuteButton();
+            
+            // --- GENERAL EVENT LISTENERS ---
             window.addEventListener('resize', onWindowResize, false);
+            document.addEventListener('keydown', onKeyDown);
+            document.addEventListener('keyup', onKeyUp);
+            document.addEventListener('mousemove', onMouseMove, false);
+            document.addEventListener('wheel', onMouseWheel, false);
+            document.body.addEventListener('click', () => { 
+                if (document.pointerLockElement !== document.body && !isUsingPC) {
+                    document.body.requestPointerLock(); 
+                }
+            });
         }
 
+        function onKeyDown(event) {
+            if (isCameraAnimating) return;
+
+            if (isUsingPC) {
+                if (event.code === 'Escape') {
+                    exitPCView();
+                }
+                return;
+            }
+
+            switch (event.code) {
+                case 'KeyW': moveForward = true; break;
+                case 'KeyA': moveLeft = true; break;
+                case 'KeyS': moveBackward = true; break;
+                case 'KeyD': moveRight = true; break;
+                case 'Enter':
+                    if (interactionTooltipElement.style.opacity === '1') {
+                        if (isNearPC) {
+                            enterPCView();
+                        } else if (isNearTV) {
+                            toggleTVControls();
+                        } else { 
+                            startTeleport();
+                        }
+                    }
+                    break;
+            }
+        }
+        function onKeyUp(event) {
+            switch (event.code) {
+                case 'KeyW': moveForward = false; break;
+                case 'KeyA': moveLeft = false; break;
+                case 'KeyS': moveBackward = false; break;
+                case 'KeyD': moveRight = false; break;
+            }
+        }
+        function onMouseMove(event) {
+            if (document.pointerLockElement === document.body) {
+                cameraTheta -= event.movementX * 0.002;
+                cameraPhi -= event.movementY * 0.002;
+                cameraPhi = Math.max(0.1, Math.min(Math.PI / 2.2, cameraPhi));
+            }
+        }
+        function onMouseWheel(event) {
+            if(isUsingPC) return;
+            cameraDistance += event.deltaY * 0.01;
+            cameraDistance = Math.max(4, Math.min(15, cameraDistance));
+        }
+
+        function toggleTVControls() {
+            const isVisible = tvControlsElement.style.display === 'flex';
+            if (isVisible) {
+                tvControlsElement.style.display = 'none';
+                document.body.requestPointerLock();
+            } else {
+                tvControlsElement.style.display = 'flex';
+                document.exitPointerLock();
+            }
+        }
+
+        function startTeleport() {
+            if (isTeleporting) return;
+            isTeleporting = true;
+            fadeOverlayElement.style.opacity = '1';
+            
+            setTimeout(() => {
+                const isInLivingRoom = robot.position.z > 0;
+                if (isInLivingRoom) {
+                    robot.position.set(0, 0, -3); 
+                    robot.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), Math.PI); 
+                } else {
+                    robot.position.set(0, 0, 3);
+                    robot.quaternion.setFromAxisAngle(new THREE.Vector3(0, 1, 0), 0);
+                }
+                
+                setTimeout(() => {
+                    fadeOverlayElement.style.opacity = '0';
+                    setTimeout(() => { isTeleporting = false; }, 500);
+                }, 100);
+            }, 500);
+        }
+
+        function enterPCView() {
+            if (isCameraAnimating) return;
+            isCameraAnimating = true;
+            isUsingPC = true;
+            document.exitPointerLock();
+
+            const monitorWorldPos = new THREE.Vector3();
+            centerMonitor.getWorldPosition(monitorWorldPos);
+
+            // Compute monitor forward (screen normal) in world space so we move the camera along the screen direction.
+            const screenDir = new THREE.Vector3();
+            centerMonitor.getWorldDirection(screenDir).normalize();
+
+            // Target camera position: placed PC_VIEW_DISTANCE meters in front of the monitor surface
+            const targetPos = monitorWorldPos.clone().add(screenDir.multiplyScalar(PC_VIEW_DISTANCE));
+
+            // Animate camera position
+            gsap.to(camera.position, {
+                x: targetPos.x,
+                y: targetPos.y,
+                z: targetPos.z,
+                duration: PC_VIEW_DURATION,
+                ease: PC_VIEW_EASE,
+            });
+
+            // Tween a temporary lookAt target and update iframe while animating so the embedded page tracks the camera move.
+            const tempTarget = new THREE.Vector3();
+            gsap.to(tempTarget, {
+                x: monitorWorldPos.x,
+                y: monitorWorldPos.y,
+                z: monitorWorldPos.z,
+                duration: PC_VIEW_DURATION,
+                ease: PC_VIEW_EASE,
+                onUpdate: () => {
+                    camera.lookAt(tempTarget);
+                    // keep iframe repositioning during zoom for smoother alignment
+                    updateIframePosition();
+                },
+                onComplete: () => {
+                    isCameraAnimating = false;
+                    updateIframePosition();
+                    websiteContainer.style.display = 'block';
+                    exitTooltip.style.display = 'block';
+                    websiteFrame.src = "https://ashishwaikar.netlify.app"; // igu=1 avoids the redirect consent page
+                }
+            });
+        }
+        
+        function exitPCView() {
+            if (isCameraAnimating) return;
+            isCameraAnimating = true;
+
+            // hide UI immediately
+            websiteContainer.style.display = 'none';
+            exitTooltip.style.display = 'none';
+            websiteFrame.src = "about:blank";
+
+            // return control to the normal camera updater smoothly
+            gsap.to({}, {
+                duration: PC_VIEW_DURATION,
+                ease: PC_VIEW_EASE,
+                onUpdate: () => updateCamera(),
+                onComplete: () => {
+                    isCameraAnimating = false;
+                    isUsingPC = false;
+                }
+            });
+        }
+
+        function updateIframePosition() {
+            if (!centerMonitor) return;
+
+            const screen = centerMonitor;
+            screen.updateWorldMatrix(true, false);
+            const box = new THREE.Box3().setFromObject(screen);
+
+            // Bottom-left and top-right corners of the monitor surface (world space)
+            const corners = [
+                new THREE.Vector3(box.min.x, box.min.y, box.max.z), // Bottom-left
+                new THREE.Vector3(box.max.x, box.max.y, box.max.z)  // Top-right
+            ];
+
+            const screenCorners = corners.map(corner => {
+                const vector = corner.project(camera);
+                return {
+                    x: (vector.x + 1) / 2 * window.innerWidth,
+                    y: (-vector.y + 1) / 2 * window.innerHeight
+                };
+            });
+
+            const [bottomLeft, topRight] = screenCorners;
+
+            // Monitor pixel width/height on the user's screen
+            const screenPixelWidth = Math.abs(topRight.x - bottomLeft.x);
+            const screenPixelHeight = Math.abs(bottomLeft.y - topRight.y);
+
+            // Keep the iframe at an internal resolution of 1280x695, but scale it to fit the monitor rectangle.
+            const internalWidth = 1280;
+            const internalHeight = 795;
+
+            // Compute scale to fit the monitor area without overflowing.
+            // We cap scale at 1 to avoid upscaling the internal resolution (preserves crispness).
+            const scale = Math.min(1, screenPixelWidth / internalWidth, screenPixelHeight / internalHeight);
+
+            // Place iframe centered on the monitor (use center + translate(-50%,-50%) via transform)
+            const centerX = (bottomLeft.x + topRight.x) / 2;
+            const centerY = (bottomLeft.y + topRight.y) / 2;
+
+            // Set the logical size (internal resolution) and center coordinates
+            websiteFrame.style.width = `${internalWidth}px`;
+            websiteFrame.style.height = `${internalHeight}px`;
+            websiteFrame.style.left = `${Math.round(centerX)}px`;
+            websiteFrame.style.top = `${Math.round(centerY)}px`;
+
+            // Use transform to translate the element by -50% in both axes (centering),
+            // and then scale it to fit the monitor area.
+            websiteFrame.style.transform = `translate(-50%, -50%) scale(${scale})`;
+            websiteFrame.style.maxWidth = '';
+            websiteFrame.style.maxHeight = '';
+        }
+        
         function onWindowResize() {
-            const aspect = window.innerWidth / window.innerHeight;
-            const d = 15;
-            camera.left = -d * aspect; camera.right = d * aspect;
-            camera.top = d; camera.bottom = -d;
+            camera.aspect = window.innerWidth / window.innerHeight;
             camera.updateProjectionMatrix();
             renderer.setSize(window.innerWidth, window.innerHeight);
             composer.setSize(window.innerWidth, window.innerHeight);
+            if (isUsingPC) {
+                updateIframePosition();
+            }
         }
 
+        function handleCollisions(delta, moveVector) {
+            const robotCollider = robot.userData.collisionBox;
+            robotCollider.updateWorldMatrix(true, false);
+            const robotBox = new THREE.Box3().setFromObject(robotCollider);
+            if (playerOnFloor) { playerVelocity.y = Math.max(0, playerVelocity.y); }
+            const verticalCheckPos = robotBox.clone().translate(new THREE.Vector3(0, playerVelocity.y * delta, 0));
+            playerOnFloor = false;
+            let verticalCollision = false;
+            const floorBox = new THREE.Box3().setFromObject(floor);
+            if (verticalCheckPos.intersectsBox(floorBox)) {
+                if (playerVelocity.y < 0) {
+                    playerVelocity.y = 0;
+                    robot.position.y = floorBox.max.y;
+                    playerOnFloor = true;
+                }
+                verticalCollision = true;
+            }
+            if (!verticalCollision) { robot.position.y += playerVelocity.y * delta; }
+            robotCollider.updateWorldMatrix(true, false);
+            const currentRobotBox = new THREE.Box3().setFromObject(robotCollider);
+            const tempRobotBoxX = currentRobotBox.clone().translate(new THREE.Vector3(moveVector.x, 0, 0));
+            const tempRobotBoxZ = currentRobotBox.clone().translate(new THREE.Vector3(0, 0, moveVector.z));
+            let collisionX = false, collisionZ = false;
+            for(const collider of colliders) {
+                const colliderBox = new THREE.Box3().setFromObject(collider);
+                if(tempRobotBoxX.intersectsBox(colliderBox)) collisionX = true;
+                if(tempRobotBoxZ.intersectsBox(colliderBox)) collisionZ = true;
+            }
+            if(!collisionX) robot.position.x += moveVector.x;
+            if(!collisionZ) robot.position.z += moveVector.z;
+        }
+
+        function updateRobot(delta) {
+            if (!playerOnFloor) { playerVelocity.y -= gravity * delta; }
+            
+            const cameraForward = new THREE.Vector3();
+            camera.getWorldDirection(cameraForward);
+            cameraForward.y = 0;
+            cameraForward.normalize();
+
+            const cameraRight = new THREE.Vector3();
+            cameraRight.crossVectors(cameraForward, new THREE.Vector3(0, 1, 0));
+            
+            const moveDirection = new THREE.Vector3();
+            if (moveForward) moveDirection.add(cameraForward);
+            if (moveBackward) moveDirection.sub(cameraForward);
+            if (moveLeft) moveDirection.sub(cameraRight); 
+            if (moveRight) moveDirection.add(cameraRight);
+            
+            if (moveDirection.lengthSq() > 0.001) {
+                moveDirection.normalize();
+                const targetAngle = Math.atan2(moveDirection.x, moveDirection.z);
+                const targetQuaternion = new THREE.Quaternion().setFromAxisAngle(new THREE.Vector3(0, 1, 0), targetAngle);
+                robot.quaternion.slerp(targetQuaternion, 0.2);
+            }
+
+            const moveVector = moveDirection.clone().multiplyScalar(playerSpeed * delta);
+            handleCollisions(delta, moveVector);
+
+            // --- INTERACTION LOGIC ---
+            const pos = robot.position;
+            const doorTriggerZ = 4.0; 
+            const doorTriggerX = 2.5;
+            const isNearDoor = Math.abs(pos.z) < doorTriggerZ && Math.abs(pos.x) < doorTriggerX;
+
+            const tvTriggerMin = new THREE.Vector3(-9, 0, 5);
+            const tvTriggerMax = new THREE.Vector3(-4, 5, 11);
+            const tvTriggerBox = new THREE.Box3(tvTriggerMin, tvTriggerMax);
+            isNearTV = tvTriggerBox.containsPoint(pos);
+
+            const pcTriggerMin = new THREE.Vector3(-4, 0, -12);
+            const pcTriggerMax = new THREE.Vector3(2, 5, -8);
+            const pcTriggerBox = new THREE.Box3(pcTriggerMin, pcTriggerMax);
+            isNearPC = pcTriggerBox.containsPoint(pos);
+
+            if (isCameraAnimating) return;
+
+            if (isNearPC) {
+                interactionTooltipElement.textContent = `Press [Enter] to use PC`;
+                interactionTooltipElement.style.opacity = '1';
+            } else if(isNearTV) {
+                 interactionTooltipElement.textContent = `Press [Enter] to use TV`;
+                 interactionTooltipElement.style.opacity = '1';
+            } else if (isNearDoor) {
+                const isInLivingRoom = pos.z > 0;
+                const newTooltipText = isInLivingRoom ? "Enter Office" : "Enter Living Room";
+                interactionTooltipElement.textContent = `Press [Enter] to ${newTooltipText}`;
+                interactionTooltipElement.style.opacity = '1';
+            } else {
+                interactionTooltipElement.style.opacity = '0';
+            }
+
+            if (!isNearTV && tvControlsElement.style.display === 'flex') {
+                tvControlsElement.style.display = 'none';
+            }
+        }
+
+        function updateCamera() {
+            cameraTarget.position.copy(robot.position);
+            cameraTarget.position.y += 1.5;
+            const offset = new THREE.Vector3();
+            offset.x = cameraDistance * Math.sin(cameraPhi) * Math.sin(cameraTheta);
+            offset.y = cameraDistance * Math.cos(cameraPhi);
+            offset.z = cameraDistance * Math.sin(cameraPhi) * Math.cos(cameraTheta);
+            const cameraPosition = cameraTarget.position.clone().add(offset);
+            const raycaster = new THREE.Raycaster(cameraTarget.position, cameraPosition.clone().sub(cameraTarget.position).normalize());
+           
+            const cameraBlockers = [...colliders, floor];
+            const intersects = raycaster.intersectObjects(cameraBlockers, true);
+            if (intersects.length > 0 && intersects[0].distance < cameraDistance) {
+                camera.position.lerp(intersects[0].point, 0.2);
+            } else {
+                camera.position.lerp(cameraPosition, 0.1);
+            }
+            camera.lookAt(cameraTarget.position);
+        }
+        
         function animate() {
             requestAnimationFrame(animate);
-            controls.update();
-
-            // Update the video texture if the video is playing
-            if (tvVideoElement && tvVideoElement.readyState >= tvVideoElement.HAVE_CURRENT_DATA) {
-                tvVideoTexture.needsUpdate = true;
+            const delta = clock.getDelta();
+            
+            if (!isUsingPC && !isTeleporting && !isCameraAnimating && robot) { 
+                updateRobot(delta); 
+                updateCamera(); 
             }
 
-            // Update TV loading canvas animation while active or fading
+            if (tvVideoElement && tvVideoElement.readyState >= tvVideoElement.HAVE_CURRENT_DATA) { tvVideoTexture.needsUpdate = true; }
             if (tvLoadingCanvas && tvLoadingCtx && tvLoadingTexture && tvLoadingMesh && (tvLoadingActive || tvLoadingMesh.material.opacity > 0)) {
-                const ctx = tvLoadingCtx;
-                const w = tvLoadingCanvas.width;
-                const h = tvLoadingCanvas.height;
-                ctx.clearRect(0, 0, w, h);
-
-                const t = performance.now() * 0.001;
-
-                // Background gradient with subtle color pulse
-                const g = ctx.createLinearGradient(0, 0, 0, h);
-                const baseA = 16 + Math.floor(8 * Math.sin(t * 2));
-                g.addColorStop(0, `rgba(${30 + baseA},${12 + baseA},${40 + baseA},1)`);
-                g.addColorStop(1, `rgba(${8 + baseA},${6 + baseA},${18 + baseA},1)`);
-                ctx.fillStyle = g;
-                ctx.fillRect(0, 0, w, h);
-
-                // Scanning horizontal lines
-                ctx.globalCompositeOperation = 'lighter';
-                ctx.fillStyle = 'rgba(255,255,255,0.02)';
-                const lines = 24;
-                for (let i = 0; i < lines; i++) {
-                    const yy = ((i / lines) * h) + (Math.sin(t * 3 + i) * 4);
-                    ctx.fillRect(0, yy, w, 1.2);
-                }
-                ctx.globalCompositeOperation = 'source-over';
-
-                // Rotating loading arc (spinner)
-                const cx = w * 0.5, cy = h * 0.5, r = Math.min(w, h) * 0.12;
-                ctx.beginPath();
-                ctx.strokeStyle = 'rgba(200,240,255,0.95)';
-                ctx.lineWidth = Math.max(2, w * 0.008);
-                ctx.arc(cx, cy, r, t * 2, t * 2 + Math.PI * 1.5);
-                ctx.stroke();
-
-                // Pulse center dot
-                ctx.beginPath();
-                ctx.fillStyle = `rgba(100,220,255,${0.5 + 0.5 * Math.sin(t * 6)})`;
-                ctx.arc(cx, cy, Math.max(2, w * 0.005) + 2 * Math.abs(Math.sin(t * 3)), 0, Math.PI * 2);
-                ctx.fill();
-
-                // Subtle static noise blocks for "analog" feel
-                ctx.globalAlpha = 0.07;
-                for (let i = 0; i < 80; i++) {
-                    const nx = Math.random() * w, ny = Math.random() * h, nw = Math.random() * 6, nh = Math.random() * 3;
-                    ctx.fillStyle = `rgba(255,255,255,${Math.random()})`;
-                    ctx.fillRect(nx, ny, nw, nh);
-                }
-                ctx.globalAlpha = 1.0;
-
-                // Small caption
-                ctx.fillStyle = 'rgba(180,220,255,0.9)';
-                ctx.font = `${Math.max(12, Math.round(w * 0.03))}px monospace`;
-                ctx.textAlign = 'center';
-                ctx.fillText('LOADING • 3D CHANNEL', cx, h - 26);
-
-                tvLoadingTexture.needsUpdate = true;
-
-                // Fade out when video starts playing
-                if (!tvLoadingActive) {
-                    tvLoadingMesh.material.opacity = Math.max(0, tvLoadingMesh.material.opacity - TV_LOADING_FADE_SPEED);
-                    if (tvLoadingMesh.material.opacity <= 0.001) {
-                        tvLoadingMesh.visible = false;
-                    }
-                }
+                const ctx = tvLoadingCtx; const w = tvLoadingCanvas.width, h = tvLoadingCanvas.height; ctx.clearRect(0, 0, w, h); const t = performance.now() * 0.001; const g = ctx.createLinearGradient(0, 0, 0, h); const baseA = 16 + Math.floor(8 * Math.sin(t * 2)); g.addColorStop(0, `rgba(${30 + baseA},${12 + baseA},${40 + baseA},1)`); g.addColorStop(1, `rgba(${8 + baseA},${6 + baseA},${18 + baseA},1)`); ctx.fillStyle = g; ctx.fillRect(0, 0, w, h); ctx.globalCompositeOperation = 'lighter'; ctx.fillStyle = 'rgba(255,255,255,0.02)'; for (let i = 0; i < 24; i++) { const yy = ((i / 24) * h) + (Math.sin(t * 3 + i) * 4); ctx.fillRect(0, yy, w, 1.2); } ctx.globalCompositeOperation = 'source-over'; const cx = w * 0.5, cy = h * 0.5, r = Math.min(w, h) * 0.12; ctx.beginPath(); ctx.strokeStyle = 'rgba(200,240,255,0.95)'; ctx.lineWidth = Math.max(2, w * 0.008); ctx.arc(cx, cy, r, t * 2, t * 2 + Math.PI * 1.5); ctx.stroke(); ctx.beginPath(); ctx.fillStyle = `rgba(100,220,255,${0.5 + 0.5 * Math.sin(t * 6)})`; ctx.arc(cx, cy, Math.max(2, w * 0.005) + 2 * Math.abs(Math.sin(t * 3)), 0, Math.PI * 2); ctx.fill(); ctx.fillStyle = 'rgba(180,220,255,0.9)'; ctx.font = `${Math.max(12, Math.round(w * 0.03))}px monospace`; ctx.textAlign = 'center'; ctx.fillText('LOADING • 3D CHANNEL', cx, h - 26); tvLoadingTexture.needsUpdate = true;
+                if (!tvLoadingActive) { tvLoadingMesh.material.opacity = Math.max(0, tvLoadingMesh.material.opacity - TV_LOADING_FADE_SPEED); if (tvLoadingMesh.material.opacity <= 0.001) tvLoadingMesh.visible = false; }
             }
-
             if (cityCtx) {
-                cityCtx.drawImage(bgCanvas, 0, 0);
-                cityCtx.fillStyle = 'rgba(255, 255, 255, 0.9)';
-                cityCtx.beginPath();
-                for (const flake of snowflakes) {
-                    flake.y += flake.speed;
-                    if (flake.y > cityCanvas.height) {
-                        flake.y = -5;
-                        flake.x = Math.random() * cityCanvas.width;
-                    }
-                    cityCtx.moveTo(flake.x, flake.y);
-                    cityCtx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2);
-                }
-                cityCtx.fill();
-                cityTexture.needsUpdate = true;
+                cityCtx.drawImage(bgCanvas, 0, 0); cityCtx.fillStyle = 'rgba(255, 255, 255, 0.9)'; cityCtx.beginPath();
+                for (const flake of snowflakes) { flake.y += flake.speed; if (flake.y > cityCanvas.height) { flake.y = -5; flake.x = Math.random() * cityCanvas.width; } cityCtx.moveTo(flake.x, flake.y); cityCtx.arc(flake.x, flake.y, flake.radius, 0, Math.PI * 2); }
+                cityCtx.fill(); cityTexture.needsUpdate = true;
             }
-
             composer.render();
         }
 
         init();
-        animate();
-    </script></body>
+        // Animate is now called by the loading manager once everything is ready
+    </script>
+</body>
 </html>
 
