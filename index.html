@@ -667,7 +667,7 @@
             const ctx = canvas.getContext('2d'); ctx.fillStyle = '#1e1e1e'; ctx.fillRect(0, 0, canvas.width, canvas.height);
             ctx.fillStyle = '#4a4a4a'; ctx.font = '10px sans-serif';
             const keyWidth = 18, keyHeight = 18, keyGap = 4, top_offset = 10, left_offset = 10;
-            const rows = ["QWERTYUIOP", "ASDFGHJKL", "ZXCVBNM"];
+            const rows = ["QWERTYUIOP", "ASDFGHJKL;", "ZXCVBNM<>"];
             for(let r=0; r < rows.length; r++) {
                 for (let i = 0; i < rows[r].length; i++) {
                     const x = left_offset + i * (keyWidth + keyGap) + (r * 10); const y = top_offset + r * (keyHeight + keyGap);
@@ -1209,18 +1209,21 @@
             const screenPixelWidth = Math.abs(topRight.x - bottomLeft.x);
             const screenPixelHeight = Math.abs(bottomLeft.y - topRight.y);
 
-            // Keep the iframe at an internal resolution of 1280x695 (match CSS)
+            // Keep the iframe logical width fixed (your desired internal resolution)
             const internalWidth = 1280;
-            const internalHeight = 695; // <-- fix: was 795
 
-            // Compute scale to fit the monitor rectangle (allow upscaling)
-            const scale = Math.min(screenPixelWidth / internalWidth, screenPixelHeight / internalHeight);
+            // Compute an internalHeight that matches the projected monitor aspect so
+            // when we scale by width, the scaled height will match the screen height.
+            const dynamicInternalHeight = Math.max(1, Math.round(internalWidth * (screenPixelHeight / screenPixelWidth)));
+
+            // Scale by width (this preserves your chosen internalWidth and keeps website responsive)
+            const scale = screenPixelWidth / internalWidth;
 
             const centerX = (bottomLeft.x + topRight.x) / 2;
             const centerY = (bottomLeft.y + topRight.y) / 2;
 
             websiteFrame.style.width = `${internalWidth}px`;
-            websiteFrame.style.height = `${internalHeight}px`;
+            websiteFrame.style.height = `${dynamicInternalHeight}px`;
             websiteFrame.style.left = `${Math.round(centerX)}px`;
             websiteFrame.style.top = `${Math.round(centerY)}px`;
             websiteFrame.style.transform = `translate(-50%, -50%) scale(${scale})`;
