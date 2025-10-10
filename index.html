@@ -193,7 +193,10 @@
         </button>
     </div>
     <div id="websiteContainer">
-        <iframe id="websiteFrame" src="about:blank"></iframe>
+        <iframe id="websiteFrame" 
+        src="about:blank"
+         sandbox="allow-scripts allow-forms allow-same-origin allow-popups allow-modals allow-top-navigation-by-user-activation"
+         style="position:absolute;border:2px solid #000;background:#000;width:1280px;height:695px;transform-origin:center center;will-change:transform,left,top;"></iframe>
         <div id="exitTooltip">Click outside the screen and Press [Esc] to Exit</div>
     </div>
 
@@ -1031,6 +1034,16 @@
                 if (document.pointerLockElement !== document.body && !isUsingPC) {
                     document.body.requestPointerLock(); 
                 }
+            });
+            // Add to the embedded site's JS (the site loaded into the iframe)
+            document.addEventListener('click', e => {
+              const a = e.target.closest('a');
+              if (!a) return;
+              const href = a.getAttribute('href') || '';
+              if (/^https?:\/\//i.test(href) && !a.target) {
+                a.target = '_blank';
+                a.rel = 'noopener noreferrer';
+              }
             });
         }
 
