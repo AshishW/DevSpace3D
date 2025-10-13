@@ -155,6 +155,66 @@
             background-color: #00bfff;
             transition: width 0.3s ease-out;
         }
+        #mobileWelcomeScreen {
+            position: fixed;
+            top: 0;
+            left: 0;
+            width: 100%;
+            height: 100%;
+            background-color: #0a0a1a;
+            z-index: 2000; /* High z-index to be on top of everything */
+            display: none; /* Hidden by default */
+            flex-direction: column;
+            justify-content: center;
+            align-items: center;
+            text-align: center;
+            padding: 20px;
+            box-sizing: border-box;
+        }
+        .mobile-content h1 {
+            color: #00bfff;
+            text-shadow: 0 0 10px #00bfff;
+            margin-bottom: 20px;
+        }
+        .mobile-content p {
+            font-size: 1.1em;
+            color: rgba(255, 255, 255, 0.8);
+            max-width: 400px;
+            margin: 0 auto 30px;
+            line-height: 1.5;
+        }
+        .mobile-content .separator {
+            margin-bottom: 30px;
+            color: rgba(255, 255, 255, 0.5);
+        }
+        .portfolio-button {
+            display: inline-block;
+            padding: 15px 30px;
+            background-color: transparent;
+            border: 2px solid #00bfff;
+            color: #00bfff;
+            text-decoration: none;
+            border-radius: 5px;
+            font-size: 1em;
+            font-weight: bold;
+            transition: background-color 0.3s, color 0.3s;
+        }
+        .portfolio-button:hover {
+            background-color: #00bfff;
+            color: #0a0a1a;
+        }
+
+        /* Class to apply when on a mobile device */
+        body.is-mobile #mobileWelcomeScreen {
+            display: flex; /* Show the welcome screen */
+        }
+        body.is-mobile canvas,
+        body.is-mobile #info,
+        body.is-mobile #interactionTooltip,
+        body.is-mobile #tvControls,
+        body.is-mobile #websiteContainer {
+            display: none !important; /* Hide 3D and its UI */
+        }
     </style>
 </head>
 <body>
@@ -163,6 +223,15 @@
         <h1>Welcome to My Virtual Space</h1>
         <div id="loadingBarContainer">
             <div id="loadingBar"></div>
+        </div>
+    </div>
+
+    <div id="mobileWelcomeScreen">
+        <div class="mobile-content">
+            <h1>Welcome!</h1>
+            <p>For the best immersive 3D experience, please use a desktop device.</p>
+            <div class="separator">OR</div>
+            <a href="https://ashishwaikar.netlify.app" class="portfolio-button">Continue to 2D Portfolio</a>
         </div>
     </div>
     
@@ -219,6 +288,8 @@
         import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
         import { gsap } from 'gsap';
 
+
+        
         // --- SCENE GLOBALS ---
         let scene, camera, renderer, composer, clock;
         let cityCanvas, cityCtx, cityTexture, bgCanvas, bgCtx, snowflakes = [];
@@ -284,7 +355,8 @@
         const PC_VIEW_EASE = "power2.inOut";
         
         // --- MATERIALS ---
-        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x2e2e48, roughness: 0.9 });
+        const wallMaterial = new THREE.MeshStandardMaterial({ color: 0x2c3e50, roughness: 0.95 });
+        const librarywallMaterial = new THREE.MeshStandardMaterial({ color: 0x4a5d50, roughness: 0.95 }); //1D303D
         const darkMaterial = new THREE.MeshStandardMaterial({ color: 0x181818, roughness: 0.4 });
         const deskMaterial = new THREE.MeshStandardMaterial({ color: 0xcccccc, roughness: 0.8 });
         
@@ -327,6 +399,7 @@
             return armGroup;
         }
 
+        
         function createRobot() {
             const robotGroup = new THREE.Group();
             const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.3 });
@@ -589,7 +662,7 @@
             const shade = new THREE.Mesh(new THREE.CylinderGeometry(0.6, 0.8, 1, 32, 1, true), shadeMaterial);
             shade.position.y = 5;
             lampGroup.add(shade);
-            const light = new THREE.PointLight(WARM_WHITE, 15, 12, 1.0);
+            const light = new THREE.PointLight( 0xe6ddeb, 15, 12, 1.0);
             light.position.y = 5;
             lampGroup.add(light);
             return lampGroup;
@@ -937,6 +1010,7 @@
             const loadingBar = document.getElementById('loadingBar');
             infoElement = document.getElementById('info');
             
+            
             const loadingManager = new THREE.LoadingManager();
             loadingManager.onProgress = (url, itemsLoaded, itemsTotal) => {
                 loadingBar.style.width = (itemsLoaded / itemsTotal) * 100 + '%';
@@ -948,14 +1022,15 @@
                     infoElement.style.display = 'block';
                     // Make sure world matrices and geometry bounding boxes are up-to-date
                     // so initial collision tests don't run with stale/empty bounds.
-                    if (scene) scene.updateMatrixWorld(true);
-                    if (floor && floor.geometry && typeof floor.geometry.computeBoundingBox === 'function') {
-                        floor.geometry.computeBoundingBox();
-                    }
-                    const robotCollider = robot && robot.userData && robot.userData.collisionBox;
-                    if (robotCollider && robotCollider.geometry && typeof robotCollider.geometry.computeBoundingBox === 'function') {
-                        robotCollider.geometry.computeBoundingBox();
-                    }
+                    // if (scene) scene.updateMatrixWorld(true);
+                    // if (floor && floor.geometry && typeof floor.geometry.computeBoundingBox === 'function') {
+                    //     floor.geometry.computeBoundingBox();
+                    // }
+                    // const robotCollider = robot && robot.userData && robot.userData.collisionBox;
+                    // if (robotCollider && robotCollider.geometry && typeof robotCollider.geometry.computeBoundingBox === 'function') {
+                    //     robotCollider.geometry.computeBoundingBox();
+                    // }
+                    clock.getDelta();
                     animate(); // Start the main loop only after everything is loaded
                 }, 800);
             };
@@ -1017,12 +1092,13 @@
                 new THREE.MeshStandardMaterial({ visible: false })
             );
             floor.position.set(0, -0.1, (ROOM_DEPTH / 2) - (ROOM_DEPTH / 2) + (LIBRARY_DEPTH/2));
-            scene.add(floor);
+            scene.add(floor); 
+            floor.geometry.computeBoundingBox();
 
             // Visual floor for main rooms
             const mainRoomFloor = new THREE.Mesh(
                 new THREE.BoxGeometry(ROOM_WIDTH, 0.2, ROOM_DEPTH),
-                new THREE.MeshStandardMaterial({ color: 0x3a3a5a })
+                new THREE.MeshStandardMaterial({ color: 0x3d2a1d })
             );
             mainRoomFloor.position.set(0, 0, 0);
             scene.add(mainRoomFloor);
@@ -1088,15 +1164,15 @@
             // Wall between Living Room and Library
             const libraryPartitionZ = ROOM_DEPTH / 2;
             const libWallSectionWidth = (ROOM_WIDTH / 2) - (doorWidth / 2);
-            const libWallSection1 = new THREE.Mesh(new THREE.BoxGeometry(libWallSectionWidth, WALL_HEIGHT, 0.2), wallMaterial);
+            const libWallSection1 = new THREE.Mesh(new THREE.BoxGeometry(libWallSectionWidth, WALL_HEIGHT, 0.2), librarywallMaterial);
             libWallSection1.position.set(-ROOM_WIDTH / 2 + libWallSectionWidth / 2, WALL_HEIGHT / 2, libraryPartitionZ);
             scene.add(libWallSection1);
             colliders.push(libWallSection1);
-            const libWallSection2 = new THREE.Mesh(new THREE.BoxGeometry(libWallSectionWidth, WALL_HEIGHT, 0.2), wallMaterial);
+            const libWallSection2 = new THREE.Mesh(new THREE.BoxGeometry(libWallSectionWidth, WALL_HEIGHT, 0.2), librarywallMaterial);
             libWallSection2.position.set(ROOM_WIDTH / 2 - libWallSectionWidth / 2, WALL_HEIGHT / 2, libraryPartitionZ);
             scene.add(libWallSection2);
             colliders.push(libWallSection2);
-            const libWallHeader = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, WALL_HEIGHT - doorHeight, 0.2), wallMaterial);
+            const libWallHeader = new THREE.Mesh(new THREE.BoxGeometry(doorWidth, WALL_HEIGHT - doorHeight, 0.2), librarywallMaterial);
             libWallHeader.position.set(0, doorHeight + (WALL_HEIGHT - doorHeight) / 2, libraryPartitionZ);
             scene.add(libWallHeader);
             colliders.push(libWallHeader);
@@ -1116,15 +1192,15 @@
             colliders.push(libraryDoor);
 
             // Library Room Walls
-            const libraryFarWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, WALL_HEIGHT, 0.2), wallMaterial);
+            const libraryFarWall = new THREE.Mesh(new THREE.BoxGeometry(ROOM_WIDTH, WALL_HEIGHT, 0.2), librarywallMaterial);
             libraryFarWall.position.set(0, WALL_HEIGHT / 2, ROOM_DEPTH / 2 + LIBRARY_DEPTH);
             scene.add(libraryFarWall);
             colliders.push(libraryFarWall);
-            const libraryLeftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, LIBRARY_DEPTH), wallMaterial);
+            const libraryLeftWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, LIBRARY_DEPTH), librarywallMaterial);
             libraryLeftWall.position.set(-ROOM_WIDTH / 2, WALL_HEIGHT / 2, ROOM_DEPTH / 2 + LIBRARY_DEPTH / 2);
             scene.add(libraryLeftWall);
             colliders.push(libraryLeftWall);
-            const libraryRightWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, LIBRARY_DEPTH), wallMaterial);
+            const libraryRightWall = new THREE.Mesh(new THREE.BoxGeometry(0.2, WALL_HEIGHT, LIBRARY_DEPTH), librarywallMaterial);
             libraryRightWall.position.set(ROOM_WIDTH / 2, WALL_HEIGHT / 2, ROOM_DEPTH / 2 + LIBRARY_DEPTH / 2);
             scene.add(libraryRightWall);
             colliders.push(libraryRightWall);
@@ -1232,6 +1308,65 @@
             piano.rotation.y = -Math.PI / 2;
             scene.add(piano);
             colliders.push(piano);
+
+            // Add 10 photo frames on the library wall where the piano is located.
+            // Uses placeholder images (replace URLs later).
+            (function addLibraryPhotoFrames() {
+                const photoCols = 5;
+                const photoRows = 2;
+                const frameW = 2.8;       // Total width of the frame
+                const frameH = 1.8;       // Total height of the frame
+                const frameDepth = 0.1;   // How thick the frame is
+                const frameColor = 0x44281d; // A dark wood color
+
+                const wallX = ROOM_WIDTH / 2 - 0.11;
+                const wallCenterZ = ROOM_DEPTH / 2 + LIBRARY_DEPTH / 2;
+                const spacingZ = 3.0;
+                const topY = 6.8;
+                const spacingY = -2;
+
+                const photoImages = [];
+
+                // --- 1. Create a reusable geometry and material for the frames ---
+                // This is more efficient than creating a new one in every loop iteration.
+                const frameGeometry = new THREE.BoxGeometry(frameW, frameH, frameDepth);
+                const frameMaterial = new THREE.MeshStandardMaterial({
+                    color: frameColor,
+                    roughness: 0.8,
+                    metalness: 0.1
+                });
+
+
+                let count = 0;
+                for (let col = 0; col < photoCols; col++) {
+                    for (let row = 0; row < photoRows; row++) {
+                        count++;
+                        const z = wallCenterZ + (col - (photoCols - 1) / 2) * spacingZ;
+                        const y = topY + row * spacingY;
+                        const idx = count - 1;
+                        const imgUrl = `https://placehold.co/400x300/DDD/000?text=Photo+${count}`;
+
+                        // --- 2. Create and position the frame mesh ---
+                        const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
+                        frameMesh.position.set(wallX, y, z);
+                        frameMesh.rotation.y = -Math.PI / 2; // Match poster rotation
+                        scene.add(frameMesh); // Add the frame to your scene
+
+
+                        // --- 3. Create the poster, positioned slightly in front of the frame ---
+                        // We subtract a small amount from 'wallX' to pull the poster forward.
+                        // The poster's 'w' and 'h' are slightly smaller than the frame's.
+                        createPoster(
+                            imgUrl,
+                            { x: wallX - (frameDepth / 2 + 0.01), y: y, z: z }, // Position poster in front
+                            { w: frameW - 0.15, h: frameH - 0.15 },            // Make poster smaller than frame
+                            textureLoader,
+                            -Math.PI / 2
+                        );
+                    }
+                }
+            })();
+
 
             // --- LIGHTING ---
             const libraryLight = new THREE.PointLight(WARM_WHITE, 25, 30, 1.2);
@@ -1731,7 +1866,22 @@
             composer.render();
         }
 
-        init();
+        (function checkDeviceType() {
+        // A common threshold for mobile devices is 768px.keeping it 1024 for tablets
+            const isMobile = window.innerWidth <= 768;
+
+            if (isMobile) {
+                document.body.classList.add('is-mobile');
+                // If it's a mobile device, we stop here and don't initialize the 3D scene.
+                return; 
+            }
+
+            // If not mobile, proceed with the 3D experience.
+            init();
+            // The animate() call is already handled by your loading manager inside init().
+
+        })(); // an IIFE - it runs immediately.
+
         // Animate is now called by the loading manager once everything is ready
     </script>
 </body>
