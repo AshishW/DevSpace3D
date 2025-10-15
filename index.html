@@ -286,6 +286,7 @@
         import { UnrealBloomPass } from 'three/addons/postprocessing/UnrealBloomPass.js';
         import { FontLoader } from 'three/addons/loaders/FontLoader.js';
         import { TextGeometry } from 'three/addons/geometries/TextGeometry.js';
+        import { RoundedBoxGeometry } from 'three/addons/geometries/RoundedBoxGeometry.js';
         import { gsap } from 'gsap';
 
 
@@ -399,13 +400,119 @@
             return armGroup;
         }
 
+        function createCircuitTexture() {
+            const canvas = document.createElement('canvas');
+            canvas.width = 256;
+            canvas.height = 256;
+            const ctx = canvas.getContext('2d');
+
+            // A dark metallic base color
+            ctx.fillStyle = '#777788';
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            // Bright circuit lines
+            ctx.strokeStyle = 'rgba(0, 255, 255, 0.6)';
+            ctx.lineWidth = 1.5;
+
+            // Draw a random grid of lines to simulate circuits
+            const gridSize = 16;
+            for (let x = 0; x < canvas.width; x += gridSize) {
+                for (let y = 0; y < canvas.height; y += gridSize) {
+                    ctx.beginPath();
+                    ctx.moveTo(x, y);
+                    if (Math.random() > 0.5) {
+                        ctx.lineTo(x + gridSize, y);
+                    } else {
+                        ctx.lineTo(x, y + gridSize);
+                    }
+                    if (Math.random() > 0.8) {
+                        ctx.moveTo(x, y);
+                        ctx.lineTo(x + (Math.random() > 0.5 ? gridSize : -gridSize), y + (Math.random() > 0.5 ? gridSize : -gridSize));
+                    }
+                    ctx.stroke();
+                }
+            }
+            return new THREE.CanvasTexture(canvas);
+        }
+
+        function createRoboWheel() {
+            const wheelGroup = new THREE.Group();
+
+            // --- Materials for the wheel parts ---
+            const tireMaterial = new THREE.MeshStandardMaterial({
+                color: 0x1a1a1a, // Very dark grey, like rubber
+                roughness: 0.9,
+                metalness: 0.1
+            });
+
+            const hubMaterial = new THREE.MeshStandardMaterial({
+                color: 0x777777, // Grey metal
+                roughness: 0.3,
+                metalness: 0.9
+            });
+
+            // We can reuse the eye's glowing material for consistency
+            const accentGlowMaterial = new THREE.MeshStandardMaterial({ 
+                color: NEON_CYAN, 
+                emissive: NEON_CYAN, 
+                emissiveIntensity: 8 
+            });
+
+            // --- Create the wheel parts ---
+
+            // 1. The outer tire
+            const tire = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.4, 0.4, 0.35, 32), // radius, radius, width of tire, segments
+                tireMaterial
+            );
+            wheelGroup.add(tire);
+
+            // 2. The inner metallic hub
+            const hub = new THREE.Mesh(
+                new THREE.CylinderGeometry(0.2, 0.2, 0.4, 16), // Slightly wider than the tire to pop out
+                hubMaterial
+            );
+            wheelGroup.add(hub);
+
+            // 3. The glowing accent ring on the hub
+            const glowRing = new THREE.Mesh(
+                new THREE.RingGeometry(0.12, 0.15, 16), // innerRadius, outerRadius, segments
+                accentGlowMaterial
+            );
+            // Position the ring on the outer surface of the hub
+            glowRing.position.z = 0.205; 
+            wheelGroup.add(glowRing);
+
+            return wheelGroup;
+        }
         
         function createRobot() {
             const robotGroup = new THREE.Group();
-            const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.3 });
+            // const bodyMaterial = new THREE.MeshStandardMaterial({ color: 0xaaaaaa, roughness: 0.3 });
             const accentMaterial = new THREE.MeshStandardMaterial({ color: 0x333333, roughness: 0.5 });
             const eyeMaterial = new THREE.MeshStandardMaterial({ color: NEON_CYAN, emissive: NEON_CYAN, emissiveIntensity: 10 });
-            const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.6, 0.8, 4, 16), bodyMaterial);
+
+            
+            const circuitTexture = createCircuitTexture();
+            circuitTexture.wrapS = THREE.RepeatWrapping;
+            circuitTexture.wrapT = THREE.RepeatWrapping;
+            circuitTexture.repeat.set(1, 1); // Adjust repeat if the texture looks too stretched/compressed
+
+            const bodyMaterial = new THREE.MeshStandardMaterial({
+                // color: 0xddddff, // A base color for the body
+                color: 0x0f0f0,
+                metalness: 0.8,
+                roughness: 0.3,
+                map: circuitTexture,
+                bumpMap: circuitTexture, // Add some relief
+                bumpScale: 0.02
+            });
+            const body = new THREE.Mesh(
+                // new THREE.BoxGeometry(1, 1.5, 0.5), // This is the old line
+                new RoundedBoxGeometry(1.15, 1.8, 0.9, 4, 0.3), // width, height, depth, segments, radius
+                bodyMaterial
+            );
+            // const body = new THREE.Mesh(new THREE.CapsuleGeometry(0.6, 0.8, 4, 16), bodyMaterial);
             body.position.y = 1.1;
             robotGroup.add(body);
             const head = new THREE.Mesh(new THREE.SphereGeometry(0.4, 32, 16), bodyMaterial);
@@ -420,24 +527,36 @@
             const antennaBall = new THREE.Mesh(new THREE.SphereGeometry(0.05, 8, 8), eyeMaterial);
             antennaBall.position.y = 2.85;
             robotGroup.add(antennaBall);
-            const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
-            const wheelL = new THREE.Mesh(wheelGeometry, accentMaterial);
-            wheelL.rotation.z = Math.PI / 2;
-            wheelL.position.set(0.65, 0.5, 0);
+            // const wheelGeometry = new THREE.CylinderGeometry(0.4, 0.4, 0.3, 16);
+            // const wheelL = new THREE.Mesh(wheelGeometry, accentMaterial);
+            // wheelL.rotation.z = Math.PI / 2;
+            // wheelL.position.set(0.65, 0.5, 0);
+            // robotGroup.add(wheelL);
+            // const wheelR = new THREE.Mesh(wheelGeometry, accentMaterial);
+            // wheelR.rotation.z = Math.PI / 2;
+            // wheelR.position.set(-0.65, 0.5, 0);
+            // robotGroup.add(wheelR);
+            
+            // Create the new robo-wheels
+            const wheelL = createRoboWheel();
+            wheelL.rotation.z = Math.PI / 2; // Keep the same rotation to make it stand upright
+            wheelL.position.set(0.65, 0.5, 0); // Keep the same position
             robotGroup.add(wheelL);
-            const wheelR = new THREE.Mesh(wheelGeometry, accentMaterial);
+
+            const wheelR = createRoboWheel();
             wheelR.rotation.z = Math.PI / 2;
             wheelR.position.set(-0.65, 0.5, 0);
             robotGroup.add(wheelR);
 
+            // robot arms
             const armL = createArm();
-            armL.position.set(0.6, 2.1, 0);
-            armL.rotation.z = 0.2;
+            armL.position.set(0.56, 2.1, 0);
+            armL.rotation.z = 0.3;
             robotGroup.add(armL);
         
             const armR = createArm();
-            armR.position.set(-0.6, 2.1, 0);
-            armR.rotation.z = -0.2;
+            armR.position.set(-0.56, 2.1, 0);
+            armR.rotation.z = -0.3;
             robotGroup.add(armR);
 
             const collisionBox = new THREE.Mesh(
@@ -1325,7 +1444,18 @@
                 const topY = 6.8;
                 const spacingY = -2;
 
-                const photoImages = [];
+                const photoImages = [
+                    './certs/AI_AGENTS_CREWAI.png',
+                    './certs/Frameworkvalley_react_codedex.png',
+                    './certs/frontendmasters_react.png',
+                    './certs/jts_ztm.jpg',
+                    './certs/complete_python_ztm.jpg',
+                    './certs/cwd_ztm.jpg',
+                    './certs/mci_dsa_ztm.jpg',
+                    './certs/mecl_hackathon.jpg',
+                    './certs/js_codedex.png',
+                    './certs/researchpaper_cert.jpg'
+                ];
 
                 // --- 1. Create a reusable geometry and material for the frames ---
                 // This is more efficient than creating a new one in every loop iteration.
@@ -1344,7 +1474,7 @@
                         const z = wallCenterZ + (col - (photoCols - 1) / 2) * spacingZ;
                         const y = topY + row * spacingY;
                         const idx = count - 1;
-                        const imgUrl = `https://placehold.co/400x300/DDD/000?text=Photo+${count}`;
+                        const imgUrl = (photoImages[idx] && photoImages[idx].length) ? photoImages[idx] : `https://placehold.co/400x300/DDD/000?text=Photo+${count}`;
 
                         // --- 2. Create and position the frame mesh ---
                         const frameMesh = new THREE.Mesh(frameGeometry, frameMaterial);
