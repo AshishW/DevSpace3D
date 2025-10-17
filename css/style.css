@@ -205,6 +205,81 @@ body.is-mobile canvas,
 body.is-mobile #info,
 body.is-mobile #interactionTooltip,
 body.is-mobile #tvControls,
-body.is-mobile #websiteContainer {
+body.is-mobile #websiteContainer,
+body.is-mobile #checklistContainer {
     display: none !important; /* Hide 3D and its UI */
+}
+
+/* Checklist Styles */
+#checklistContainer {
+    position: fixed;
+    top: 20px;
+    right: 20px;
+    width: 320px;
+    background-color: rgba(10, 10, 26, 0.85);
+    border: 1px solid #00bfff;
+    border-radius: 8px;
+    z-index: 101;
+    backdrop-filter: blur(5px);
+    box-shadow: 0 0 15px rgba(0, 191, 255, 0.2);
+    color: #e0e0e0;
+    font-family: 'Courier New', Courier, monospace;
+    transition: transform 0.3s ease-in-out;
+}
+
+#checklistHeader {
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+    padding: 10px 15px;
+    border-bottom: 1px solid rgba(0, 191, 255, 0.3);
+}
+
+#checklistHeader h2 {
+    margin: 0;
+    font-size: 16px;
+    color: #00bfff;
+    text-shadow: 0 0 5px #00bfff;
+}
+
+#checklistToggleBtn {
+    background: transparent;
+    border: 1px solid #00bfff;
+    color: #00bfff;
+    padding: 4px 8px;
+    border-radius: 4px;
+    cursor: pointer;
+    font-size: 12px;
+    transition: background-color 0.3s, color 0.3s;
+}
+
+#checklistToggleBtn:hover {
+    background-color: #00bfff;
+    color: #101018;
+}
+
+#checklist {
+    list-style: none;
+    padding: 10px 15px;
+    margin: 0;
+    transition: all 0.3s ease-in-out;
+    max-height: 300px; /* for transition */
+    overflow: hidden;
+}
+
+#checklist li {
+    padding: 8px 0;
+    transition: color 0.3s, text-decoration 0.3s;
+}
+
+#checklist li.completed {
+    color: #6a9955;
+    text-decoration: line-through;
+}
+
+#checklistContainer.hidden #checklist {
+    max-height: 0;
+    padding-top: 0;
+    padding-bottom: 0;
+    opacity: 0;
 }

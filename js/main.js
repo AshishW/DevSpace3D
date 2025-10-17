@@ -18,7 +18,8 @@ import { createMonitor, createPoster, createEmissiveBox } from './components/roo
 import { setupCitySceneAndTexture, createFireplace, updateAnimatedTextures } from './fx/animatedTextures.js';
 import { setupPostprocessing } from './fx/postprocessing.js';
 import { onKeyDown, onKeyUp, onMouseMove, onMouseWheel, updateRobot } from './controls/movement.js';
-import { playTvIndex, exitPCView } from './controls/interactions.js';
+import { playTvIndex } from './controls/interactions.js';
+import { initChecklist } from './ui/checklist.js';
 
 // --- SCENE GLOBALS ---
 let scene, camera, renderer, composer, clock;
@@ -71,6 +72,7 @@ function init() {
         setTimeout(() => {
             splashScreen.style.display = 'none';
             infoElement.style.display = 'block';
+            initChecklist(); // Initialize the checklist UI
             clock.getDelta();
             animate();
         }, 800);

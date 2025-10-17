@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { gsap } from 'gsap';
+import { completeTask } from '../ui/checklist.js';
 
 let isTeleporting = false;
 
@@ -41,6 +42,8 @@ export function enterPCView(camera, centerMonitor, PC_VIEW_DISTANCE, PC_VIEW_DUR
     window.isCameraAnimating = true;
     window.isUsingPC = true;
     document.exitPointerLock();
+
+    completeTask('portfolio'); // Mark portfolio task as complete
 
     const monitorWorldPos = new THREE.Vector3();
     centerMonitor.getWorldPosition(monitorWorldPos);

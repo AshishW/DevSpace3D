@@ -1,5 +1,6 @@
 import * as THREE from 'three';
 import { startTeleport, enterPCView, toggleTVControls, exitPCView } from './interactions.js';
+import { completeTask } from '../ui/checklist.js';
 
 let moveForward = false, moveBackward = false, moveLeft = false, moveRight = false;
 let playerVelocity = new THREE.Vector3();
@@ -124,6 +125,14 @@ export function updateRobot(robot, camera, delta, colliders, floor, interactionT
 
     const libraryDoorTriggerZ = ROOM_DEPTH / 2;
     const isNearLibraryDoor = Math.abs(pos.z - libraryDoorTriggerZ) < doorTriggerZ && Math.abs(pos.x) < doorTriggerX;
+
+    // --- Task Completion ---
+    if (pos.z > 1) { // Robot is in the living room area
+        completeTask('living-room');
+    }
+    if (pos.z > libraryDoorTriggerZ + 1) { // Robot is in the library area
+        completeTask('library');
+    }
 
     const tvTriggerMin = new THREE.Vector3(-9, 0, 5);
     const tvTriggerMax = new THREE.Vector3(-4, 5, 11);
