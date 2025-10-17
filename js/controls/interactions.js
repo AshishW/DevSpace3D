@@ -102,24 +102,25 @@ export function exitPCView(PC_VIEW_DURATION, PC_VIEW_EASE, updateCamera, website
 }
 
 export function toggleTVControls(tvControlsElement) {
-    const isVisible = tvControlsElement.style.display === 'flex';
-    if (isVisible) {
-        tvControlsElement.style.display = 'none';
-        document.body.requestPointerLock();
-    } else {
-        tvControlsElement.style.display = 'flex';
-        document.exitPointerLock();
+    if (window.isNearTV) {
+        const isVisible = tvControlsElement.style.display === 'flex';
+        tvControlsElement.style.display = isVisible ? 'none' : 'flex';
+        
+        // If controls were hidden and are now being shown, complete the task.
+        if (!isVisible) {
+            completeTask('living-room');
+        }
     }
 }
 
-export function playTvIndex(tvVideoElement, tvPlaylist, tvPlaylistIndex) {
-    let newIndex = ((tvPlaylistIndex % tvPlaylist.length) + tvPlaylist.length) % tvPlaylist.length;
-    tvVideoElement.src = tvPlaylist[newIndex];
-    tvVideoElement.load();
-    const p = tvVideoElement.play();
+export function playTvIndex(videoElement, playlist, index) {
+    const newIndex = (index + playlist.length) % playlist.length;
+    videoElement.src = playlist[newIndex];
+    videoElement.load();
+    const p = videoElement.play();
     if (p !== undefined) {
         p.catch(() => {
-            const resume = () => { tvVideoElement.play().catch(()=>{}); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
+            const resume = () => { videoElement.play().catch(()=>{}); window.removeEventListener('pointerdown', resume); window.removeEventListener('keydown', resume); };
             window.addEventListener('pointerdown', resume);
             window.addEventListener('keydown', resume);
         });

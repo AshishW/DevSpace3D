@@ -127,9 +127,6 @@ export function updateRobot(robot, camera, delta, colliders, floor, interactionT
     const isNearLibraryDoor = Math.abs(pos.z - libraryDoorTriggerZ) < doorTriggerZ && Math.abs(pos.x) < doorTriggerX;
 
     // --- Task Completion ---
-    if (pos.z > 1) { // Robot is in the living room area
-        completeTask('living-room');
-    }
     if (pos.z > libraryDoorTriggerZ + 1) { // Robot is in the library area
         completeTask('library');
     }
