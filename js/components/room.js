@@ -25,15 +25,40 @@ export function createMonitor(scene, colliders, x, z, rotationY, isCenter = fals
     return null;
 }
 
-export function createPoster(scene, imageUrl, position, size, textureLoader, rotationY = 0) {
-    const posterMaterial = new THREE.MeshStandardMaterial({
-        map: textureLoader.load(imageUrl),
-        color: 0xcccccc
+export function createPoster(scene, imageUrl, position, size, textureLoader, rotationY = 0, useBasicMaterial = false) {
+    textureLoader.load(imageUrl, (texture) => {
+        texture.colorSpace = THREE.SRGBColorSpace;
+        texture.minFilter = THREE.LinearFilter;
+        texture.magFilter = THREE.LinearFilter;
+
+        if (useBasicMaterial) {
+            // Create a group for the poster with a border
+            const frameGroup = new THREE.Group();
+
+            // Create the border
+            const borderSize = 0.1;
+            const frameGeometry = new THREE.PlaneGeometry(size.w + borderSize, size.h + borderSize);
+            const frameMaterial = new THREE.MeshBasicMaterial({ color: 0x111111 });
+            const frame = new THREE.Mesh(frameGeometry, frameMaterial);
+            frameGroup.add(frame);
+
+            // Create the poster image, slightly in front of the border
+            const posterMaterial = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, color: 0x888888 });
+            const poster = new THREE.Mesh(new THREE.PlaneGeometry(size.w, size.h), posterMaterial);
+            poster.position.z = 0.01; // Position poster in front of the frame to avoid z-fighting
+            frameGroup.add(poster);
+
+            frameGroup.position.copy(position);
+            frameGroup.rotation.y = rotationY;
+            scene.add(frameGroup);
+        } else {
+            const posterMaterial = new THREE.MeshStandardMaterial({ map: texture, roughness: 0.8 });
+            const poster = new THREE.Mesh(new THREE.PlaneGeometry(size.w, size.h), posterMaterial);
+            poster.position.set(position.x, position.y, position.z);
+            poster.rotation.y = rotationY;
+            scene.add(poster);
+        }
     });
-    const poster = new THREE.Mesh(new THREE.PlaneGeometry(size.w, size.h), posterMaterial);
-    poster.position.set(position.x, position.y, position.z);
-    poster.rotation.y = rotationY;
-    scene.add(poster);
 }
 
 export function createEmissiveBox(scene, color, intensity, position, size) {

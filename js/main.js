@@ -95,7 +95,7 @@ function init() {
     document.body.appendChild(renderer.domElement);
 
     robot = createRobot();
-    robot.position.set(0, 0, 11);
+    robot.position.set(0, 0, 5);
     scene.add(robot);
     scene.add(cameraTarget);
 
@@ -292,6 +292,15 @@ function init() {
     createPoster(scene, 'https://placehold.co/400x300/000000/FFFFFF?text=JS', { x: -7.2, y: 4.5, z: -13.5 }, { w: 2.5, h: 1.8 }, textureLoader, Math.PI / 2);
     createPoster(scene, 'https://placehold.co/300x400/000000/FFFFFF?text=UI/UX', { x: -7.2, y: 4.5, z: -10.5 }, { w: 1.8, h: 2.5 }, textureLoader, Math.PI / 2);
     createPoster(scene, 'https://placehold.co/300x400/000000/FFFFFF?text=SYNTH', { x: -4, y: 8, z: -14.8 }, { w: 1.8, h: 2.5 }, textureLoader);
+    createPoster(
+        scene,
+        './assets/certs/30NitesOfCode.png', // <-- your certificate image path
+        { x: -7.2, y: 4.5, z: -5 }, // <-- adjust x, y, z for placement
+        { w: 3.8, h: 2.2 }, // <-- same size as library certificates
+        textureLoader,
+        Math.PI/2, // <-- rotate to face into the room
+        true
+    );
     const sofa = createSofa();
     sofa.position.set(3.5, 0.1, 8);
     sofa.rotation.y = -Math.PI / 2;
