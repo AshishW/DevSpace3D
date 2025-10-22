@@ -579,7 +579,11 @@ function updateIframePosition() {
 function animate() {
     requestAnimationFrame(animate);
     if (scene) scene.updateMatrixWorld(true);
-    const delta = clock.getDelta();
+    // const delta = clock.getDelta();
+
+    // Cap delta to 0.1s (max 10 fps), prevents physics bugs after tab switch
+    let delta = clock.getDelta();
+    delta = Math.min(delta, 0.1); // Cap delta to 100ms
 
     if (!window.isUsingPC && !window.isCameraAnimating && robot) {
         updateRobot(robot, camera, delta, colliders, floor, interactionTooltipElement, tvControlsElement, ROOM_DEPTH);
