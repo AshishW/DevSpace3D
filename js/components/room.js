@@ -43,7 +43,7 @@ export function createPoster(scene, imageUrl, position, size, textureLoader, rot
             frameGroup.add(frame);
 
             // Create the poster image, slightly in front of the border
-            const posterMaterial = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, color: 0x888888 });
+            const posterMaterial = new THREE.MeshBasicMaterial({ map: texture, toneMapped: false, color: 0xc4bdbd }); //888888
             const poster = new THREE.Mesh(new THREE.PlaneGeometry(size.w, size.h), posterMaterial);
             poster.position.z = 0.01; // Position poster in front of the frame to avoid z-fighting
             frameGroup.add(poster);
